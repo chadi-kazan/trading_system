@@ -31,10 +31,10 @@
   - [x] ~~Validate performance by retrieving 2 tickers via test script (Deliverable: reproducible test case; Result: `tests/smoke_yahoo_provider.py`).~~
 
 ## Phase 2: Universe Discovery & Screening (Initial Pass)
-- [ ] Implement universe builder that screens tickers by market cap, volume, float, and sector (Deliverable: `universe/builder.py`; Success: returns filtered DataFrame for 5-year window).
-  - [ ] Integrate fundamental data sources (Yahoo fundamentals baseline) (Deliverable: ingestion methods + caching).
-  - [ ] Add liquidity and sector filtering logic (Deliverable: functions returning boolean masks).
-  - [ ] Persist resulting universe snapshot (Deliverable: CSV under `data/universe/`).
+- [x] ~~Implement universe builder that screens tickers by market cap, volume, float, and sector (Deliverable: `universe/builder.py`; Completed: 2025-09-21; Notes: Yahoo fundamentals + cached snapshots).~~
+  - [x] ~~Integrate fundamental data sources (Yahoo fundamentals baseline) (Deliverable: ingestion methods + caching; Result: yfinance fast_info with JSON cache).~~
+  - [x] ~~Add liquidity and sector filtering logic (Deliverable: functions returning boolean masks; Result: dollar volume, float, spread, sector & exchange filters).~~
+  - [x] ~~Persist resulting universe snapshot (Deliverable: CSV under `data/universe/`; Result: timestamped saves via `UniverseBuilder`).~~
 
 ## Phase 3: Strategy Modules (MVP Signals)
 - [ ] Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data).
