@@ -3,3 +3,7 @@ __pycache__/
 *.pyo
 *.pyd
 trading_env/Lib
+trading_env/Scripts
+trading_env/Include
+trading_env/share
+trading_env/etc

@@ -3,7 +3,10 @@
 ## System Overview
 Build a comprehensive Python-based trading analysis and screening system for small-cap growth stocks using documented successful individual investor strategies. The system should auto-discover stocks, backtest multiple strategies, manage risk, and provide actionable trading signals.
 
-## Core Requirements
+## Work Methodology
+Read the below and think very hard to properly understand the requirements, the expected outcome and come up with an implementation plan. create a project_plan.md file at the root of the project where you outline this plan and split it into SMART tasks and sub tasks. each time you implement a task or a sub task, review the plan and update it if necessary. cross out any tasks / sub tasks you imeplement to keep track of the implementation progress. 
+ 
+ ## Core Requirements
 
 ### Target Universe & Strategy
 - **Stock Universe**: Small-cap stocks ($50M-$2B market cap) with growth potential
