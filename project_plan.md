@@ -35,6 +35,8 @@
   - [x] ~~Integrate fundamental data sources (Yahoo fundamentals baseline) (Deliverable: ingestion methods + caching; Result: yfinance fast_info with JSON cache).~~
   - [x] ~~Add liquidity and sector filtering logic (Deliverable: functions returning boolean masks; Result: dollar volume, float, spread, sector & exchange filters).~~
   - [x] ~~Persist resulting universe snapshot (Deliverable: CSV under `data/universe/`; Result: timestamped saves via `UniverseBuilder`).~~
+  - [x] ~~Introduce seed candidate loader and smoke integration (Deliverable: `universe/candidates.py`; Notes: fallback list + optional CSV override).~~
+  - [x] ~~Add automated unit tests for universe filters (Deliverable: `tests/test_universe_builder.py`; Result: mock ticker injections).~~
 
 ## Phase 3: Strategy Modules (MVP Signals)
 - [ ] Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data).
@@ -56,3 +58,4 @@
 ## Ongoing Governance
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries.
 - [ ] Maintain logging, error handling, and documentation parity with implemented features.
+- [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.

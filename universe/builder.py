@@ -7,7 +7,7 @@ import logging
 from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Any, Dict, Iterable, List
+from typing import Any, Callable, Dict, Iterable, List
 
 import pandas as pd
 import yfinance as yf
@@ -57,6 +57,7 @@ class UniverseBuilder:
         config: TradingSystemConfig,
         cache_dir: Path | None = None,
         cache_ttl_days: int | None = None,
+        ticker_factory: Callable[[str], Any] | None = None,
     ) -> None:
         self.config = config
         self.criteria: UniverseCriteriaConfig = config.universe_criteria
@@ -65,6 +66,7 @@ class UniverseBuilder:
         self.cache_dir.mkdir(parents=True, exist_ok=True)
         self.universe_dir = config.storage.universe_dir
         self.universe_dir.mkdir(parents=True, exist_ok=True)
+        self._ticker_factory = ticker_factory or yf.Ticker
 
     # ------------------------------------------------------------------
     # Public API
@@ -126,7 +128,7 @@ class UniverseBuilder:
         return snapshot
 
     def _fetch_symbol_data(self, symbol: str) -> SymbolSnapshot | None:
-        ticker = yf.Ticker(symbol)
+        ticker = self._ticker_factory(symbol)
         try:
             fast_info = ticker.fast_info
             fast_dict = dict(fast_info) if fast_info is not None else {}

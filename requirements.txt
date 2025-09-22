@@ -28,3 +28,5 @@ pathlib2>=2.3.7; python_version<'3.4'
 
 # Additional utilities
 python-dateutil>=2.8.0
+pytest>=7.0.0
+

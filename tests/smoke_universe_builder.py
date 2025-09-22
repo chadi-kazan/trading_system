@@ -17,7 +17,8 @@ from universe.builder import UniverseBuilder
 def run() -> None:
     config = ConfigManager().load()
     builder = UniverseBuilder(config)
-    tickers = ["AAPL", "MSFT", "PLUG", "NVAX", "FCEL", "SOFI"]
+    from universe.candidates import load_seed_candidates
+    tickers = load_seed_candidates()[:50]
     universe = builder.build_universe(tickers, as_of=date.today(), persist=False)
     print(f"Selected {len(universe)} symbols from {len(tickers)} candidates")
     if not universe.empty:
