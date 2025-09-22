@@ -45,7 +45,7 @@
 - [x] ~~Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data; Completed: 2025-09-21; Notes: `strategies/dan_zanger.py` with configurable params and pytest coverage).~~
   - [x] ~~Establish strategy scaffolding and indicator helpers (Deliverable: `strategies/base.py`, `indicators/moving_average.py`; Notes: shared signal dataclasses).~~
 
-- [ ] Deliver CAN SLIM scorer with weighted criteria (Deliverable: scoring module + threshold logic).
+- [x] ~~Deliver CAN SLIM scorer with weighted criteria (Deliverable: scoring module + threshold logic; Completed: 2025-09-21; Notes: `strategies/canslim.py` with pytest coverage).~~
 - [ ] Deliver Trend Following EMA crossover strategy (Deliverable: indicator module + signal generator).
 - [ ] Deliver Livermore breakout detector (Deliverable: pattern analysis module + signals).
 - [ ] Implement signal aggregation logic with configurable weights (Deliverable: aggregator module + tests).
