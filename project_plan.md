@@ -48,7 +48,7 @@
 - [x] ~~Deliver CAN SLIM scorer with weighted criteria (Deliverable: scoring module + threshold logic; Completed: 2025-09-21; Notes: `strategies/canslim.py` with pytest coverage).~~
 - [x] ~~Deliver Trend Following EMA crossover strategy (Deliverable: indicator module + signal generator; Completed: 2025-09-21; Notes: `strategies/trend_following.py` with EMA/ATR logic and tests).~~
 - [x] ~~Deliver Livermore breakout detector (Deliverable: pattern analysis module + signals; Completed: 2025-09-21; Notes: `strategies/livermore.py` with breakout tests).~~
-- [ ] Implement signal aggregation logic with configurable weights (Deliverable: aggregator module + tests).
+- [x] ~~Implement signal aggregation logic with configurable weights (Deliverable: aggregator module + tests; Completed: 2025-09-21; Notes: `strategies/aggregation.py` with pytest coverage).~~
 
 ## Phase 4: Risk Management & Portfolio Tracking
 - [ ] Build position sizing engine respecting risk and sector caps (Deliverable: portfolio module + tests).
