@@ -29,6 +29,7 @@
   - [x] ~~Design provider abstraction & caching policy (Deliverable: interface description + docstring; Result: `data_providers/base.py` protocol & dataclasses).~~
   - [x] ~~Implement daily OHLCV fetch with retry/backoff (Deliverable: function/class method with pandas output; Result: `YahooPriceProvider.get_price_history`).~~
   - [x] ~~Validate performance by retrieving 2 tickers via test script (Deliverable: reproducible test case; Result: `tests/smoke_yahoo_provider.py`).~~
+  - [x] ~~Add automated tests for Yahoo provider caching (Deliverable: `tests/test_yahoo_provider.py`; Result: cache validation & refresh cases).~~
 
 ## Phase 2: Universe Discovery & Screening (Initial Pass)
 - [x] ~~Implement universe builder that screens tickers by market cap, volume, float, and sector (Deliverable: `universe/builder.py`; Completed: 2025-09-21; Notes: Yahoo fundamentals + cached snapshots).~~
@@ -36,6 +37,7 @@
   - [x] ~~Add liquidity and sector filtering logic (Deliverable: functions returning boolean masks; Result: dollar volume, float, spread, sector & exchange filters).~~
   - [x] ~~Persist resulting universe snapshot (Deliverable: CSV under `data/universe/`; Result: timestamped saves via `UniverseBuilder`).~~
   - [x] ~~Introduce seed candidate loader and smoke integration (Deliverable: `universe/candidates.py`; Notes: fallback list + optional CSV override).~~
+  - [x] ~~Add unit tests for seed candidate loader (Deliverable: `tests/test_candidates.py`; Result: CSV parsing & fallback coverage).~~
   - [x] ~~Add automated unit tests for universe filters (Deliverable: `tests/test_universe_builder.py`; Result: mock ticker injections).~~
 
 ## Phase 3: Strategy Modules (MVP Signals)
