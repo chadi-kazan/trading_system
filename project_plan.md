@@ -58,7 +58,7 @@
 - [x] ~~Integrate portfolio health monitoring (Deliverable: `portfolio/health.py` with alerts/sector checks).~~
 
 ## Phase 5: Backtesting & Reporting
-- [ ] Implement backtesting engine with transaction costs (Deliverable: `backtesting/engine.py`; tests on synthetic data).
+- [x] ~~Implement backtesting engine with transaction costs (Deliverable: `backtesting/engine.py`; tests on synthetic data).~~
 - [ ] Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`).
 - [ ] Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows).
 
