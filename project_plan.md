@@ -52,7 +52,7 @@
 
 ## Phase 4: Risk Management & Portfolio Tracking
 - [x] ~~Build position sizing engine respecting risk and sector caps (Deliverable: portfolio module + tests; Completed: 2025-09-21; Notes: `portfolio/position_sizer.py` with pytest coverage).~~
-- [ ] Implement drawdown monitoring and alerts (Deliverable: analytics module + logging/email hooks).
+- [x] ~~Implement drawdown monitoring and alerts (Deliverable: analytics module + logging/email hooks; Completed: 2025-09-21; Notes: `portfolio/drawdown_monitor.py` with pytest coverage).~~
 - [ ] Create paper trading ledger with entry/exit tracking (Deliverable: CSV-backed ledger + update routines).
 
 ## Phase 5: Backtesting & Reporting
