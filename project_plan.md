@@ -39,6 +39,7 @@
   - [x] ~~Introduce seed candidate loader and smoke integration (Deliverable: `universe/candidates.py`; Notes: fallback list + optional CSV override).~~
   - [x] ~~Add unit tests for seed candidate loader (Deliverable: `tests/test_candidates.py`; Result: CSV parsing & fallback coverage).~~
   - [x] ~~Add automated unit tests for universe filters (Deliverable: `tests/test_universe_builder.py`; Result: mock ticker injections).~~
+  - [x] ~~Capture skipped tickers and relax float/spread handling (Deliverable: `universe/builder.py`; Notes: diagnostics for missing fundamentals).~~
 
 ## Phase 3: Strategy Modules (MVP Signals)
 - [ ] Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data).

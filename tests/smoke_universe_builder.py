@@ -21,6 +21,12 @@ def run() -> None:
     tickers = load_seed_candidates()[:50]
     universe = builder.build_universe(tickers, as_of=date.today(), persist=False)
     print(f"Selected {len(universe)} symbols from {len(tickers)} candidates")
+    skipped = builder.last_skipped_symbols()
+    if skipped:
+        sample = ', '.join(skipped[:10])
+        if len(skipped) > 10:
+            sample += ', ...'
+        print(f"Skipped {len(skipped)} symbols due to missing fundamentals or fetch errors: {sample}")
     if not universe.empty:
         print(universe[["symbol", "market_cap", "dollar_volume", "sector"]].head().to_string(index=False))
     else:

@@ -67,6 +67,7 @@ class UniverseBuilder:
         self.universe_dir = config.storage.universe_dir
         self.universe_dir.mkdir(parents=True, exist_ok=True)
         self._ticker_factory = ticker_factory or yf.Ticker
+        self._last_skipped: list[str] = []
 
     # ------------------------------------------------------------------
     # Public API
@@ -81,6 +82,8 @@ class UniverseBuilder:
 
         as_of = as_of or date.today()
         snapshots: List[SymbolSnapshot] = []
+        skipped_errors: list[str] = []
+        skipped_missing: list[str] = []
         for raw_symbol in symbols:
             symbol = raw_symbol.strip().upper()
             if not symbol:
@@ -89,10 +92,16 @@ class UniverseBuilder:
                 snapshot = self._get_snapshot(symbol)
             except Exception as exc:  # pylint: disable=broad-except
                 LOGGER.warning("Skipping %s due to fetch error: %s", symbol, exc)
+                skipped_errors.append(symbol)
                 continue
             if snapshot is None:
+                skipped_missing.append(symbol)
                 continue
             snapshots.append(snapshot)
+
+        self._last_skipped = skipped_errors + skipped_missing
+        if self._last_skipped:
+            LOGGER.info("Skipped %s symbols (errors=%s, missing_data=%s)", len(self._last_skipped), len(skipped_errors), len(skipped_missing))
 
         frame = pd.DataFrame(snapshot.to_dict() for snapshot in snapshots)
         if frame.empty:
@@ -113,6 +122,11 @@ class UniverseBuilder:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
+    def last_skipped_symbols(self) -> List[str]:
+        """Return symbols skipped during the most recent build."""
+        return list(self._last_skipped)
+
+
     def _universe_filename(self, as_of: date) -> Path:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         return self.universe_dir / f"universe_{as_of.isoformat()}_{timestamp}.csv"
@@ -204,10 +218,12 @@ class UniverseBuilder:
         filtered = filtered[filtered["dollar_volume"] >= criteria.min_daily_volume]
 
         if criteria.min_float > 0:
-            filtered = filtered[filtered["float_shares"].fillna(0) >= criteria.min_float]
+            float_ok = filtered["float_shares"].isna() | (filtered["float_shares"] >= criteria.min_float)
+            filtered = filtered[float_ok]
 
         if criteria.max_spread > 0:
-            filtered = filtered[filtered["bid_ask_spread"].fillna(0) <= criteria.max_spread]
+            spread_ok = filtered["bid_ask_spread"].isna() | (filtered["bid_ask_spread"] <= criteria.max_spread)
+            filtered = filtered[spread_ok]
 
         if criteria.target_sectors:
             allowed = {sector.lower() for sector in criteria.target_sectors}

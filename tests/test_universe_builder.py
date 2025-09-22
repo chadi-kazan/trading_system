@@ -125,3 +125,51 @@ def test_builder_uses_cache_round_trip(config_with_tmp_storage):
     result = builder.build_universe(["CACHE"], persist=False)
 
     assert list(result["symbol"]) == ["CACHE"]
+
+
+def test_builder_records_skipped_symbols(config_with_tmp_storage):
+    config = config_with_tmp_storage
+
+    data_map = {
+        "GOOD": {
+            "fast": {
+                "market_cap": 200_000_000,
+                "last_price": 15.0,
+                "ten_day_average_volume": 200_000,
+                "shares_float": 25_000_000,
+                "bid": 14.9,
+                "ask": 15.1,
+            },
+            "info": {
+                "sector": "Technology",
+                "exchange": "NASDAQ",
+                "shortName": "Good Co",
+            },
+        },
+        "MISS": {
+            "fast": {
+                "market_cap": None,
+                "last_price": None,
+                "ten_day_average_volume": None,
+                "shares_float": None,
+                "bid": None,
+                "ask": None,
+            },
+            "info": {},
+        },
+    }
+
+    def factory(symbol: str):
+        return DummyTicker(symbol, data_map)
+
+    builder = UniverseBuilder(
+        config,
+        cache_dir=config.storage.universe_dir / "cache",
+        cache_ttl_days=0,
+        ticker_factory=factory,
+    )
+
+    result = builder.build_universe(["GOOD", "MISS"], persist=False)
+
+    assert list(result["symbol"]) == ["GOOD"]
+    assert builder.last_skipped_symbols() == ["MISS"]
