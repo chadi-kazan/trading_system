@@ -55,6 +55,7 @@
 - [x] ~~Implement drawdown monitoring and alerts (Deliverable: analytics module + logging/email hooks; Completed: 2025-09-21; Notes: `portfolio/drawdown_monitor.py` and `portfolio/alerts.py` with pytest coverage).~~
 - [x] ~~Create paper trading ledger with entry/exit tracking (Deliverable: CSV-backed ledger + update routines; Completed: 2025-09-21; Notes: `portfolio/ledger.py` with pytest coverage).~~
 - [x] ~~Add equity curve utilities for monitoring (Deliverable: `portfolio/equity_curve.py` + tests).~~
+- [x] ~~Integrate portfolio health monitoring (Deliverable: `portfolio/health.py` with alerts/sector checks).~~
 
 ## Phase 5: Backtesting & Reporting
 - [ ] Implement backtesting engine with transaction costs (Deliverable: `backtesting/engine.py`; tests on synthetic data).
