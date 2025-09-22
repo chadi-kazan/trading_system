@@ -1,0 +1,66 @@
+{
+  "email": {
+    "smtp_server": "smtp.gmail.com",
+    "smtp_port": 587,
+    "username": "user@example.com",
+    "password": "app_password",
+    "recipient": "alerts@example.com",
+    "use_tls": true
+  },
+  "risk_management": {
+    "max_positions": 20,
+    "individual_stop": 0.08,
+    "portfolio_stop": 0.2,
+    "sector_limits": {
+      "biotech": 0.35,
+      "technology": 0.4,
+      "energy": 0.3,
+      "other": 0.25
+    },
+    "position_sizing": "equal_weight"
+  },
+  "strategy_weights": {
+    "zanger": 0.3,
+    "canslim": 0.25,
+    "trend_following": 0.25,
+    "livermore": 0.2
+  },
+  "data_sources": {
+    "yahoo_finance": true,
+    "alpha_vantage_key": null,
+    "fred_api_key": null,
+    "sec_edgar_enabled": false,
+    "cache_days": 7
+  },
+  "universe_criteria": {
+    "market_cap_min": 50000000,
+    "market_cap_max": 2000000000,
+    "min_daily_volume": 500000,
+    "max_spread": 0.03,
+    "min_float": 10000000,
+    "target_sectors": [
+      "Biotechnology",
+      "Technology",
+      "Energy",
+      "Utilities"
+    ],
+    "exchange_whitelist": [
+      "NYSE",
+      "NASDAQ",
+      "AMEX"
+    ]
+  },
+  "storage": {
+    "price_cache_dir": "data/prices/cache",
+    "universe_dir": "data/universe",
+    "signal_dir": "data/signals",
+    "portfolio_dir": "data/portfolio"
+  },
+  "automation": {
+    "scan_frequency": "weekly",
+    "scan_day": "sunday",
+    "scan_time": "21:00",
+    "timezone": "US/Eastern",
+    "send_reports": true
+  }
+}
