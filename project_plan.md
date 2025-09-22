@@ -42,7 +42,9 @@
   - [x] ~~Capture skipped tickers and relax float/spread handling (Deliverable: `universe/builder.py`; Notes: diagnostics for missing fundamentals).~~
 
 ## Phase 3: Strategy Modules (MVP Signals)
-- [ ] Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data).
+- [x] ~~Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data; Completed: 2025-09-21; Notes: `strategies/dan_zanger.py` with configurable params and pytest coverage).~~
+  - [x] ~~Establish strategy scaffolding and indicator helpers (Deliverable: `strategies/base.py`, `indicators/moving_average.py`; Notes: shared signal dataclasses).~~
+
 - [ ] Deliver CAN SLIM scorer with weighted criteria (Deliverable: scoring module + threshold logic).
 - [ ] Deliver Trend Following EMA crossover strategy (Deliverable: indicator module + signal generator).
 - [ ] Deliver Livermore breakout detector (Deliverable: pattern analysis module + signals).
