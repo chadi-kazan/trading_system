@@ -62,11 +62,12 @@
 - [x] ~~Implement individual strategy backtesting harness (Deliverable: `backtesting/runner.py`; tests on synthetic data).~~
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
-- [ ] Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows).
+- [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
 
 ## Ongoing Governance
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries.
 - [ ] Maintain logging, error handling, and documentation parity with implemented features.
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+
 
 
