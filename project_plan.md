@@ -61,7 +61,7 @@
 - [x] ~~Implement backtesting engine with transaction costs (Deliverable: `backtesting/engine.py`; tests on synthetic data).~~
 - [x] ~~Implement individual strategy backtesting harness (Deliverable: `backtesting/runner.py`; tests on synthetic data).~~
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
-- [ ] Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`).
+- [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [ ] Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows).
 
 ## Ongoing Governance
