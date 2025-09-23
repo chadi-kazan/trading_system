@@ -5,6 +5,7 @@ Build a comprehensive Python-based trading analysis and screening system for sma
 
 ## Work Methodology
 Read the below and think very hard to properly understand the requirements, the expected outcome and come up with an implementation plan. create a project_plan.md file at the root of the project where you outline this plan and split it into SMART tasks and sub tasks. each time you implement a task or a sub task, review the plan and update it if necessary. cross out any tasks / sub tasks you imeplement to keep track of the implementation progress. 
+Do not constantly ask me for approval to run scripts, i am hereby granting you my explicit approval. only stop and ask me if you need clarifications
  
  ## Core Requirements
 
