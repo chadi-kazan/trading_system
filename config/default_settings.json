@@ -27,9 +27,9 @@
   },
   "data_sources": {
     "yahoo_finance": true,
-    "alpha_vantage_key": null,
-    "fred_api_key": null,
-    "sec_edgar_enabled": false,
+    "alpha_vantage_key": "NCEOY4LWSDTMDX0F",
+    "fred_api_key": "876624f1811df6cca56ada4d09a9cad8",
+    "sec_edgar_enabled": true,
     "cache_days": 7
   },
   "universe_criteria": {
@@ -42,7 +42,11 @@
       "Biotechnology",
       "Technology",
       "Energy",
-      "Utilities"
+      "Utilities",
+      "FinTech",
+      "Healthcare",
+      "Financial Services",
+      "Basic Materials"
     ],
     "exchange_whitelist": [
       "NYSE",

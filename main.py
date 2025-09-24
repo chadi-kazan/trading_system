@@ -8,7 +8,7 @@ import shutil
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
-from typing import Callable, Dict, Iterable, List, Optional, Sequence
+from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Sequence
 
 import pandas as pd
 
@@ -17,7 +17,6 @@ from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
 from data_providers.base import PriceRequest
-from data_providers.yahoo import YahooPriceProvider
 from portfolio.equity_curve import load_equity_curve
 from portfolio.health import PortfolioHealthConfig, PortfolioHealthMonitor
 from portfolio.position_sizer import PositionSizer
@@ -34,8 +33,11 @@ from trading_system.config_manager import (
     TradingSystemConfig,
     EmailConfig as AppEmailConfig,
 )
-from universe.builder import UniverseBuilder
 from universe.candidates import load_seed_candidates
+
+if TYPE_CHECKING:
+    from data_providers.yahoo import YahooPriceProvider
+    from universe.builder import UniverseBuilder
 
 logger = logging.getLogger("trading_system.cli")
 
@@ -104,10 +106,10 @@ def load_price_frame_from_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Price file not found: {path}")
     frame = pd.read_csv(path)
+    frame.columns = [str(column).lower() for column in frame.columns]
     if "date" in frame.columns:
         frame["date"] = pd.to_datetime(frame["date"])
         frame = frame.set_index("date")
-    frame.columns = [str(column).lower() for column in frame.columns]
     frame = frame.sort_index()
     if frame.index.name is None:
         frame.index.name = "date"
@@ -119,6 +121,13 @@ def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystem
         return load_price_frame_from_csv(Path(args.prices))
 
     if args.symbol:
+        try:
+            from data_providers.yahoo import YahooPriceProvider
+        except ModuleNotFoundError as exc:  # pragma: no cover - dependency hint
+            raise RuntimeError(
+                "Yahoo Finance price downloads require the `yfinance` package. Install it via `pip install yfinance`."
+            ) from exc
+
         start_date, end_date = resolve_date_range(args.start, args.end)
         provider = YahooPriceProvider(
             cache_dir=config.storage.price_cache_dir,
@@ -134,6 +143,7 @@ def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystem
         return result.data
 
     raise ValueError("Either --prices or --symbol must be provided for backtesting")
+
 
 
 def instantiate_strategies(
@@ -165,6 +175,7 @@ def instantiate_strategies(
     return instances
 
 
+
 def build_position_sizer(config: TradingSystemConfig):
     sizer = PositionSizer(config.risk_management)
 
@@ -175,6 +186,7 @@ def build_position_sizer(config: TradingSystemConfig):
     return size_positions
 
 
+
 def build_strategy_weight_map(config: TradingSystemConfig) -> Dict[str, float]:
     weights = config.strategy_weights.as_dict()
     return {
@@ -183,6 +195,7 @@ def build_strategy_weight_map(config: TradingSystemConfig) -> Dict[str, float]:
         TrendFollowingStrategy.name: float(weights.get("trend_following", 0.0)),
         LivermoreBreakoutStrategy.name: float(weights.get("livermore", 0.0)),
     }
+
 
 
 def build_email_dispatcher(config: TradingSystemConfig) -> EmailDispatcher:
@@ -198,12 +211,14 @@ def build_email_dispatcher(config: TradingSystemConfig) -> EmailDispatcher:
     return EmailDispatcher(dispatcher_config)
 
 
+
 def send_backtest_email(config: TradingSystemConfig, performance_df: pd.DataFrame, attribution_df: pd.DataFrame) -> None:
     dispatcher = build_email_dispatcher(config)
     body_parts = ["Performance metrics:\n", performance_df.to_csv()]
     if not attribution_df.empty:
         body_parts.extend(["\nAttribution:\n", attribution_df.to_csv()])
     dispatcher.send_alert("Backtest Performance Summary", "".join(body_parts))
+
 
 
 def send_scan_email(config: TradingSystemConfig, universe_df: pd.DataFrame) -> None:
@@ -215,6 +230,7 @@ def send_scan_email(config: TradingSystemConfig, universe_df: pd.DataFrame) -> N
         body.append("\nTop screened symbols:\n")
         body.append(summary[columns].to_csv(index=False) if columns else summary.to_csv(index=False))
     dispatcher.send_alert("Universe Scan Results", "".join(body))
+
 
 
 def send_health_email(config: TradingSystemConfig, report) -> None:
@@ -229,6 +245,7 @@ def send_health_email(config: TradingSystemConfig, report) -> None:
         ]
         lines.append("\nSector breaches:\n" + "\n".join(breaches))
     dispatcher.send_alert("Portfolio Health Alerts", "\n".join(lines))
+
 
 
 def save_backtest_outputs(
@@ -260,7 +277,15 @@ def save_backtest_outputs(
     logger.info("Combined equity curve saved to %s", curve_path)
 
 
+
 def handle_scan(args: argparse.Namespace, ctx: AppContext) -> int:
+    try:
+        from universe.builder import UniverseBuilder
+    except ModuleNotFoundError as exc:  # pragma: no cover - dependency hint
+        raise RuntimeError(
+            "Universe scanning requires the `yfinance` package. Install it via `pip install yfinance`."
+        ) from exc
+
     candidates: List[str]
     if args.symbols:
         candidates = [symbol.strip().upper() for symbol in args.symbols if symbol]
@@ -296,6 +321,7 @@ def handle_scan(args: argparse.Namespace, ctx: AppContext) -> int:
         send_scan_email(ctx.config, universe_df)
 
     return 0
+
 
 
 def handle_backtest(args: argparse.Namespace, ctx: AppContext) -> int:
@@ -360,6 +386,7 @@ def handle_backtest(args: argparse.Namespace, ctx: AppContext) -> int:
     return 0
 
 
+
 def handle_report(args: argparse.Namespace, ctx: AppContext) -> int:
     if not any([args.performance, args.attribution, args.equity]):
         logger.error("Provide at least one report path using --performance, --attribution, or --equity")
@@ -391,6 +418,7 @@ def handle_report(args: argparse.Namespace, ctx: AppContext) -> int:
             print("\nEquity curve tail:\n", series.tail())
 
     return 0
+
 
 
 def handle_health(args: argparse.Namespace, ctx: AppContext) -> int:
@@ -432,6 +460,7 @@ def handle_health(args: argparse.Namespace, ctx: AppContext) -> int:
     return 0
 
 
+
 def handle_notebook(args: argparse.Namespace, _ctx: AppContext) -> int:
     template_path = Path(args.template)
     dest_path = Path(args.dest)
@@ -447,6 +476,7 @@ def handle_notebook(args: argparse.Namespace, _ctx: AppContext) -> int:
     shutil.copy2(template_path, dest_path)
     print(f"Notebook copied to {dest_path}")
     return 0
+
 
 
 def build_parser() -> argparse.ArgumentParser:
@@ -501,6 +531,7 @@ def build_parser() -> argparse.ArgumentParser:
     return parser
 
 
+
 def main(argv: Optional[Sequence[str]] = None) -> int:
     parser = build_parser()
     args = parser.parse_args(argv)
@@ -517,4 +548,3 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
-
