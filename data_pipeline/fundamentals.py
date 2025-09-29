@@ -3,10 +3,15 @@
 from __future__ import annotations
 
 import json
+import logging
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Optional
 
 import pandas as pd
+
+from .alpha_vantage_client import AlphaVantageClient, AlphaVantageError
+
+LOGGER = logging.getLogger(__name__)
 
 
 def _to_float(value: Any) -> float | None:
@@ -64,8 +69,43 @@ def _load_csv_fundamentals(path: Path, symbol: str) -> Dict[str, float]:
     return result
 
 
-def load_fundamental_metrics(symbol: str, base_dir: Path) -> Dict[str, float]:
-    """Return normalized fundamental metrics for *symbol* from known cache locations."""
+def _map_alpha_overview(payload: Dict[str, Any]) -> Dict[str, float]:
+    metrics: Dict[str, float] = {}
+
+    earnings_growth = _to_float(payload.get("QuarterlyEarningsGrowthYOY"))
+    if earnings_growth is not None:
+        metrics["earnings_growth"] = earnings_growth
+
+    fifty_two_high = _to_float(payload.get("52WeekHigh"))
+    fifty_two_low = _to_float(payload.get("52WeekLow"))
+    moving_avg = _to_float(
+        payload.get("50DayMovingAverage")
+        or payload.get("200DayMovingAverage")
+        or payload.get("AnalystTargetPrice")
+    )
+    if (
+        fifty_two_high is not None
+        and fifty_two_low is not None
+        and moving_avg is not None
+        and fifty_two_high > fifty_two_low
+    ):
+        relative_strength = (moving_avg - fifty_two_low) / (fifty_two_high - fifty_two_low)
+        metrics["relative_strength"] = float(max(0.0, min(1.0, relative_strength)))
+
+    market_cap = _to_float(payload.get("MarketCapitalization"))
+    if market_cap is not None:
+        metrics["market_cap"] = market_cap
+
+    return metrics
+
+
+def load_fundamental_metrics(
+    symbol: str,
+    base_dir: Path,
+    api_key: Optional[str] = None,
+    client: Optional[AlphaVantageClient] = None,
+) -> Dict[str, float]:
+    """Return normalized fundamental metrics for *symbol* from cache or Alpha Vantage."""
 
     cleaned_symbol = symbol.upper().strip()
     if not cleaned_symbol:
@@ -84,6 +124,20 @@ def load_fundamental_metrics(symbol: str, base_dir: Path) -> Dict[str, float]:
         data = _load_csv_fundamentals(csv_path, cleaned_symbol)
         if data:
             return data
+
+    if api_key:
+        try:
+            av_client = client or AlphaVantageClient(api_key)
+        except ValueError:
+            return {}
+        try:
+            overview = av_client.fetch_company_overview(cleaned_symbol)
+        except (AlphaVantageError, Exception) as exc:  # pragma: no cover - network faults
+            LOGGER.warning("Alpha Vantage overview fetch failed for %s: %s", cleaned_symbol, exc)
+        else:
+            mapped = _map_alpha_overview(overview)
+            if mapped:
+                return mapped
 
     return {}
 

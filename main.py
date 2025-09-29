@@ -127,7 +127,7 @@ def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystem
         csv_path = Path(args.prices)
         frame = load_price_frame_from_csv(csv_path)
         symbol = frame.attrs.get("symbol", csv_path.stem.upper())
-        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir)
+        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir, config.data_sources.alpha_vantage_key)
         return enrich_price_frame(symbol, frame, fundamentals=fundamentals)
 
     if args.symbol:
@@ -155,7 +155,7 @@ def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystem
         data.attrs["symbol"] = symbol
         data.attrs["source"] = "yahoo"
         data.attrs["interval"] = args.interval
-        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir)
+        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir, config.data_sources.alpha_vantage_key)
         return enrich_price_frame(symbol, data, fundamentals=fundamentals)
 
     raise ValueError("Either --prices or --symbol must be provided for backtesting")
@@ -627,6 +627,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+
 
 
 

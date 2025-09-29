@@ -63,6 +63,7 @@ Key configuration sections:
 - **risk_management** – Maximum positions, individual/portfolio stops, and sector limits used by `portfolio.position_sizer.PositionSizer` and `portfolio.health.PortfolioHealthMonitor`.
 - **strategy_weights** – Default allocations for combined backtests and reporting weights.
 - **data_sources** – Caching controls for Yahoo downlinks.
+  - Set `alpha_vantage_key` (or `TS_ALPHA_VANTAGE_KEY`) to enable on-demand Alpha Vantage fundamentals when cached files are missing.
 - **universe_criteria** – Market-cap, volume, float, spread, and sector filters enforced by `universe/builder.py`.
 - **storage** – Output directories for cached prices, signal archives, and portfolio snapshots.
 - **fundamentals** - Optional CSV/JSON caches under `storage.universe_dir` that override enrichment metrics (earnings growth, relative strength).
@@ -104,7 +105,7 @@ python main.py backtest --help
 
 **Methodology:**
 1. **Seed list** – Start from `data/universe/seed_candidates.csv` or an explicit ticker list (`--symbols`).
-2. **Fundamentals fetch** – Pulls fresh fundamentals via Yahoo Finance (cached for configured TTL).
+2. **Fundamentals fetch** ? Pulls fresh fundamentals via Yahoo Finance (cached for configured TTL) and falls back to Alpha Vantage when an API key is provided.
 3. **Filters** – Applies market cap, volume, bid/ask spread, float, sector, and exchange screens as defined in config.
 4. **Russell 2000 merge** - Use `--include-russell` to append the bundled constituents from `data/universe/russell_2000.csv`.
 4. **Persistence** – Saves accepted names to `storage.universe_dir` unless `--no-persist` is supplied.

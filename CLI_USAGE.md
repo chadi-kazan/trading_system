@@ -33,6 +33,7 @@ python main.py backtest [--prices CSV | --symbol TICKER] [--start YYYY-MM-DD]
 
 - Use `--prices` for a local OHLCV file or `--symbol` to fetch via Yahoo Finance.
 - The CLI enriches price data on the fly (relative strength, 52-week highs, volume trends) so CAN SLIM and other strategies have the columns they expect.
+- Provide an Alpha Vantage API key via config (`data_sources.alpha_vantage_key`) to fetch fundamentals when local caches are empty.
 - The backtesting engine sizes positions using `risk_management` settings and simulates trades with transaction costs to produce realistic equity curves.
 - `--strategies` accepts any combination of `dan_zanger`, `canslim`, `trend`, `livermore` (aliases resolved automatically).
 - If `data/universe/fundamentals/` or `fundamentals.csv` exists, those values override derived enrichment metrics during backtests.
