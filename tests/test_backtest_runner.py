@@ -45,9 +45,10 @@ def test_backtest_runner_summarizes_results():
         DummyStrategy("strategy_b", 0.7),
     ]
 
-    reports = runner.run_strategies(data, strategies, position_sizer=dummy_sizer)
+    reports = runner.run_strategies(data, strategies, position_sizer=dummy_sizer, symbol="TEST")
     summary = runner.summarize_reports(reports)
 
     assert len(reports) == 2
     assert summary["strategy_a"] == 100_000
     assert summary["strategy_b"] == 100_000
+

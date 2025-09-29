@@ -29,6 +29,7 @@ class StrategyBacktestRunner:
         strategies: Iterable[Strategy],
         position_sizer,
         initial_capital: float = 100_000,
+        symbol: str = "ASSET",
     ) -> List[StrategyBacktestReport]:
         reports: List[StrategyBacktestReport] = []
         for strategy in strategies:
@@ -37,15 +38,16 @@ class StrategyBacktestRunner:
                 strategy=strategy,
                 position_sizer=position_sizer,
                 initial_capital=initial_capital,
+                symbol=symbol,
             )
             reports.append(StrategyBacktestReport(strategy.name, result))
         return reports
 
     @staticmethod
     def summarize_reports(reports: Iterable[StrategyBacktestReport]) -> Dict[str, float]:
-        summary = {}
+        summary: Dict[str, float] = {}
         for report in reports:
-            summary[report.strategy_name] = report.result.metrics.get("final", 0.0)
+            summary[report.strategy_name] = float(report.result.metrics.get("final", 0.0))
         return summary
 
 

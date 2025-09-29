@@ -31,6 +31,8 @@ python main.py backtest [--prices CSV | --symbol TICKER] [--start YYYY-MM-DD]
 ```
 
 - Use `--prices` for a local OHLCV file or `--symbol` to fetch via Yahoo Finance.
+- The CLI enriches price data on the fly (relative strength, 52-week highs, volume trends) so CAN SLIM and other strategies have the columns they expect.
+- The backtesting engine sizes positions using `risk_management` settings and simulates trades with transaction costs to produce realistic equity curves.
 - `--strategies` accepts any combination of `dan_zanger`, `canslim`, `trend`, `livermore` (aliases resolved automatically).
 - When `--output-dir` is provided, performance metrics are written to `DIR/performance/` and combined results to `DIR/combined/`.
 - `--email` sends performance and attribution tables using the configured email dispatcher.

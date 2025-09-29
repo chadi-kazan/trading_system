@@ -5,6 +5,8 @@
 - Prioritize incremental delivery: working data access and filtering before advanced analytics.
 - Maintain reliability through caching, error handling, and repeatable configuration.
 - Validate each component with focused tests or dry-run scripts before integration.
+- After every feature implementation suggest a git commit message that i can use to commit the files you changed.
+- Update the README.md file if necessary to document new patterns/usage after every implementation. 
 
 ## Phase 0: Planning & Baseline
 - [x] ~~Review instructions and capture key constraints (Deliverable: notes in this plan; Completed: 2025-09-21).~~
@@ -63,10 +65,19 @@
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
+## Recent Updates (2025-09-24)
+- [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
+- [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
+
+## Next Actions
+1. Sync documentation (`README.md`, `CLI_USAGE.md`) with the enriched data pipeline and enhanced backtesting behavior.
+2. Extend CLI regression tests to assert enriched fields are present in backtest runs.
+3. Evaluate external fundamentals feeds to replace the earnings-growth proxy and broaden the candidate universe.
+
 
 ## Ongoing Governance
-- [ ] Update this plan after each completed task/sub-task with notes and new discoveries.
-- [ ] Maintain logging, error handling, and documentation parity with implemented features.
+- [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-09-24)
+- [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
 
 

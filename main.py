@@ -16,6 +16,7 @@ from automation.emailer import EmailConfig as DispatcherEmailConfig, EmailDispat
 from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
+from data_pipeline.enrichment import enrich_price_frame
 from data_providers.base import PriceRequest
 from portfolio.equity_curve import load_equity_curve
 from portfolio.health import PortfolioHealthConfig, PortfolioHealthMonitor
@@ -102,6 +103,10 @@ def resolve_date_range(start: Optional[str], end: Optional[str], years: int = 3)
     return start_date, end_date
 
 
+
+
+
+
 def load_price_frame_from_csv(path: Path) -> pd.DataFrame:
     if not path.exists():
         raise FileNotFoundError(f"Price file not found: {path}")
@@ -113,12 +118,45 @@ def load_price_frame_from_csv(path: Path) -> pd.DataFrame:
     frame = frame.sort_index()
     if frame.index.name is None:
         frame.index.name = "date"
+    frame.attrs["symbol"] = path.stem.upper()
+    frame.attrs["source_path"] = str(path)
     return frame
-
 
 def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystemConfig) -> pd.DataFrame:
     if args.prices:
-        return load_price_frame_from_csv(Path(args.prices))
+        csv_path = Path(args.prices)
+        frame = load_price_frame_from_csv(csv_path)
+        symbol = frame.attrs.get("symbol", csv_path.stem.upper())
+        return enrich_price_frame(symbol, frame)
+
+    if args.symbol:
+        try:
+            from data_providers.yahoo import YahooPriceProvider
+        except ModuleNotFoundError as exc:  # pragma: no cover - dependency hint
+            raise RuntimeError(
+                "Yahoo Finance price downloads require the `yfinance` package. Install it via `pip install yfinance`."
+            ) from exc
+
+        start_date, end_date = resolve_date_range(args.start, args.end)
+        provider = YahooPriceProvider(
+            cache_dir=config.storage.price_cache_dir,
+            cache_ttl_days=config.data_sources.cache_days,
+        )
+        symbol = args.symbol.upper()
+        request = PriceRequest(
+            symbol=symbol,
+            start=start_date,
+            end=end_date,
+            interval=args.interval,
+        )
+        result = provider.get_price_history(request)
+        data = result.data.copy()
+        data.attrs["symbol"] = symbol
+        data.attrs["source"] = "yahoo"
+        data.attrs["interval"] = args.interval
+        return enrich_price_frame(symbol, data)
+
+    raise ValueError("Either --prices or --symbol must be provided for backtesting")
 
     if args.symbol:
         try:
@@ -339,12 +377,16 @@ def handle_backtest(args: argparse.Namespace, ctx: AppContext) -> int:
     runner = StrategyBacktestRunner(BacktestingEngine())
     position_sizer = build_position_sizer(ctx.config)
 
+    inferred_symbol = price_data.attrs.get("symbol") if hasattr(price_data, "attrs") else None
+    active_symbol = (args.symbol.upper() if args.symbol else None) or inferred_symbol or "ASSET"
+
     try:
         reports = runner.run_strategies(
             price_data=price_data,
             strategies=strategies,
             position_sizer=position_sizer,
             initial_capital=args.capital,
+            symbol=active_symbol,
         )
     except Exception as exc:
         logger.exception("Backtest execution failed: %s", exc)
@@ -548,3 +590,12 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+
+
+
+
+
+
+
+
+
