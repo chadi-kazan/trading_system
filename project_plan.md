@@ -69,11 +69,12 @@
 - [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
 - [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
 - [x] Added fundamentals loader and enrichment overrides sourced from universe caches.
+- [x] Added Russell 2000 seeding support and CLI flag to merge constituents into scans.
 
 ## Next Actions
 1. Automate the refresh of fundamentals caches (scheduled universe scans + validation).
 2. Prototype external fundamentals sourcing (e.g., Alpha Vantage) for richer metrics beyond cached files.
-3. Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+3. Build a CLI task to periodically update the Russell 2000 seed list from an external provider.
 
 
 ## Ongoing Governance

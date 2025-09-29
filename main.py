@@ -34,7 +34,7 @@ from trading_system.config_manager import (
     TradingSystemConfig,
     EmailConfig as AppEmailConfig,
 )
-from universe.candidates import load_seed_candidates
+from universe.candidates import load_seed_candidates, RUSSELL_2000_PATH
 
 if TYPE_CHECKING:
     from data_providers.yahoo import YahooPriceProvider
@@ -361,7 +361,11 @@ def handle_scan(args: argparse.Namespace, ctx: AppContext) -> int:
         candidates = [symbol.strip().upper() for symbol in args.symbols if symbol]
     else:
         seed_path = Path(args.seed_candidates) if args.seed_candidates else None
-        candidates = load_seed_candidates(seed_path)
+        extra_sources: list[Path] = []
+        if args.include_russell:
+            extra_sources.append(RUSSELL_2000_PATH)
+
+        candidates = load_seed_candidates(seed_path, extra_sources=extra_sources)
 
     if args.limit and args.limit > 0:
         candidates = candidates[: args.limit]
@@ -567,6 +571,7 @@ def build_parser() -> argparse.ArgumentParser:
     scan.add_argument("--symbols", nargs="+", help="Explicit symbols to scan")
     scan.add_argument("--limit", type=int, help="Limit number of symbols to evaluate")
     scan.add_argument("--preview-rows", type=int, default=5, help="Rows to show in CLI preview")
+    scan.add_argument("--include-russell", action="store_true", help="Include Russell 2000 constituents in the candidate seed list")
     scan.add_argument("--output", type=Path, help="Optional CSV path for scan results")
     scan.add_argument("--no-persist", action="store_true", help="Skip persisting to configured storage directory")
     scan.add_argument("--email", action="store_true", help="Email summary using configured dispatcher")

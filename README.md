@@ -106,6 +106,7 @@ python main.py backtest --help
 1. **Seed list** – Start from `data/universe/seed_candidates.csv` or an explicit ticker list (`--symbols`).
 2. **Fundamentals fetch** – Pulls fresh fundamentals via Yahoo Finance (cached for configured TTL).
 3. **Filters** – Applies market cap, volume, bid/ask spread, float, sector, and exchange screens as defined in config.
+4. **Russell 2000 merge** - Use `--include-russell` to append the bundled constituents from `data/universe/russell_2000.csv`.
 4. **Persistence** – Saves accepted names to `storage.universe_dir` unless `--no-persist` is supplied.
 5. **Diagnostics** – Reports skipped symbols for missing data or API errors.
 

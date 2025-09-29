@@ -63,8 +63,14 @@ def test_build_parser_attaches_handlers():
     assert hasattr(args, "handler")
 
 
-def test_load_price_data_for_backtest_enriches_csv(tmp_path):
+def test_scan_parser_supports_russell_flag():
+    parser = build_parser()
+    args = parser.parse_args(["scan", "--include-russell"])
+    assert args.include_russell is True
+    assert hasattr(args, "handler")
 
+
+def test_load_price_data_for_backtest_enriches_csv(tmp_path):
     config = _load_config()
     path = tmp_path / "prices.csv"
     pd.DataFrame({

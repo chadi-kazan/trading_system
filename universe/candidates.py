@@ -5,7 +5,7 @@ from __future__ import annotations
 import csv
 import io
 from pathlib import Path
-from typing import Iterable, List
+from typing import Iterable, List, Sequence
 
 DEFAULT_CANDIDATES = [
     "PLUG",
@@ -41,6 +41,7 @@ DEFAULT_CANDIDATES = [
 ]
 
 DEFAULT_PATH = Path("data/universe/seed_candidates.csv")
+RUSSELL_2000_PATH = Path("data/universe/russell_2000.csv")
 
 
 def _normalise(symbols: Iterable[str]) -> List[str]:
@@ -84,13 +85,30 @@ def _load_symbols_from_file(path: Path) -> List[str]:
     return _normalise(flattened)
 
 
-def load_seed_candidates(path: Path | None = None) -> List[str]:
+def load_seed_candidates(path: Path | None = None, extra_sources: Sequence[Path] | None = None) -> List[str]:
     """Load candidate tickers from a file or fall back to defaults."""
     target_path = path or DEFAULT_PATH
     symbols = _load_symbols_from_file(target_path)
-    if symbols:
-        return symbols
-    return _normalise(DEFAULT_CANDIDATES)
+
+    combined = symbols or _normalise(DEFAULT_CANDIDATES)
+
+    for source in extra_sources or []:
+        extra = _load_symbols_from_file(source)
+        if extra:
+            combined = _normalise(list(combined) + extra)
+
+    return combined
 
 
-__all__ = ["load_seed_candidates", "DEFAULT_CANDIDATES", "DEFAULT_PATH"]
+def load_russell_2000_candidates() -> List[str]:
+    """Convenience helper that returns tickers from the Russell 2000 CSV."""
+    return _load_symbols_from_file(RUSSELL_2000_PATH)
+
+
+__all__ = [
+    "load_seed_candidates",
+    "load_russell_2000_candidates",
+    "DEFAULT_CANDIDATES",
+    "DEFAULT_PATH",
+    "RUSSELL_2000_PATH",
+]

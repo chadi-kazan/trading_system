@@ -2,7 +2,12 @@ from __future__ import annotations
 
 from pathlib import Path
 
-from universe.candidates import DEFAULT_CANDIDATES, load_seed_candidates
+from universe import candidates
+from universe.candidates import (
+    DEFAULT_CANDIDATES,
+    load_russell_2000_candidates,
+    load_seed_candidates,
+)
 
 
 def test_loads_from_csv(tmp_path: Path) -> None:
@@ -31,3 +36,27 @@ def test_handles_plain_text_list(tmp_path: Path) -> None:
     symbols = load_seed_candidates(file_path)
 
     assert symbols == ["PLUG", "NVAX"]
+
+
+def test_extra_sources_are_combined(tmp_path: Path) -> None:
+    extra_path = tmp_path / "extra.csv"
+    extra_path.write_text("symbol\nIWM\nIWN\n", encoding="utf-8")
+
+    symbols = load_seed_candidates(extra_sources=[extra_path])
+
+    assert "IWM" in symbols
+    assert "IWN" in symbols
+
+
+def test_load_russell_2000_candidates_uses_configured_path(tmp_path: Path) -> None:
+    original_path = candidates.RUSSELL_2000_PATH
+    try:
+        override = tmp_path / "russell_2000.csv"
+        override.write_text("symbol\nABC\nXYZ\n", encoding="utf-8")
+        candidates.RUSSELL_2000_PATH = override
+
+        symbols = load_russell_2000_candidates()
+
+        assert symbols == ["ABC", "XYZ"]
+    finally:
+        candidates.RUSSELL_2000_PATH = original_path

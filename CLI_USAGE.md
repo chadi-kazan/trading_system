@@ -18,6 +18,7 @@ python main.py scan [--seed-candidates CSV] [--symbols TICKER ...] [--limit N]
 ```
 
 - Provide explicit tickers with `--symbols` or a CSV via `--seed-candidates`.
+- Use `--include-russell` to merge the bundled Russell 2000 list (`data/universe/russell_2000.csv`) with your seeds.
 - Results are saved under the configured storage directory unless `--no-persist` is supplied.
 - `--email` sends the first ten passing symbols using the configured SMTP settings.
 
