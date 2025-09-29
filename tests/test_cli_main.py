@@ -1,4 +1,5 @@
 from argparse import Namespace
+from types import SimpleNamespace
 import json
 import pandas as pd
 
@@ -9,6 +10,7 @@ from main import (
     instantiate_strategies,
     load_price_frame_from_csv,
     load_price_data_for_backtest,
+    AppContext,
 )
 from trading_system.config_manager import ConfigManager
 
@@ -70,6 +72,41 @@ def test_scan_parser_supports_russell_flag():
     assert hasattr(args, "handler")
 
 
+
+
+
+def test_handle_refresh_fundamentals(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["refresh-fundamentals", "--throttle", "0"])
+
+    class DummyStorage:
+        universe_dir = tmp_path
+
+    class DummyDataSources:
+        alpha_vantage_key = "demo"
+
+    ctx = AppContext(manager=None, config=SimpleNamespace(data_sources=DummyDataSources(), storage=DummyStorage()))
+
+    monkeypatch.setattr('main.load_seed_candidates', lambda seed_path, extra_sources=None: ['ABC'])
+
+    captured = {}
+
+    def fake_refresh(symbols, base_dir, api_key, throttle_seconds):
+        captured["symbols"] = symbols
+        captured["base_dir"] = base_dir
+        captured["api_key"] = api_key
+        captured["throttle"] = throttle_seconds
+        return len(symbols)
+
+    monkeypatch.setattr('main.refresh_fundamentals_cache', fake_refresh)
+
+    result = args.handler(args, ctx)
+
+    assert result == 0
+    assert captured["symbols"] == ['ABC']
+    assert captured["base_dir"] == tmp_path
+    assert captured["api_key"] == 'demo'
+    assert captured["throttle"] == 0.0
 def test_load_price_data_for_backtest_enriches_csv(tmp_path):
     config = _load_config()
     path = tmp_path / "prices.csv"

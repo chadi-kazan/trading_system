@@ -16,7 +16,7 @@ from automation.emailer import EmailConfig as DispatcherEmailConfig, EmailDispat
 from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
-from data_pipeline import enrich_price_frame, load_fundamental_metrics
+from data_pipeline import enrich_price_frame, load_fundamental_metrics, refresh_fundamentals_cache
 from data_providers.base import PriceRequest
 from portfolio.equity_curve import load_equity_curve
 from portfolio.health import PortfolioHealthConfig, PortfolioHealthMonitor
@@ -557,6 +557,37 @@ def handle_notebook(args: argparse.Namespace, _ctx: AppContext) -> int:
 
 
 
+def handle_refresh_fundamentals(args: argparse.Namespace, ctx: AppContext) -> int:
+    api_key = ctx.config.data_sources.alpha_vantage_key
+    if not api_key:
+        logger.error("Alpha Vantage API key not configured; set data_sources.alpha_vantage_key or TS_ALPHA_VANTAGE_KEY.")
+        return 1
+
+    seed_path = Path(args.seed_candidates) if args.seed_candidates else None
+    extra_sources: list[Path] = []
+    if args.include_russell:
+        extra_sources.append(RUSSELL_2000_PATH)
+
+    symbols = load_seed_candidates(seed_path, extra_sources=extra_sources)
+
+    if args.symbols:
+        manual = [sym.strip().upper() for sym in args.symbols if sym]
+        symbols = list(dict.fromkeys(manual + symbols))
+
+    if args.limit and args.limit > 0:
+        symbols = symbols[: args.limit]
+
+    refreshed = refresh_fundamentals_cache(
+        symbols=symbols,
+        base_dir=ctx.config.storage.universe_dir,
+        api_key=api_key,
+        throttle_seconds=args.throttle,
+    )
+    print(f"Cached fundamentals for {refreshed} symbols")
+    return 0
+
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Small-Cap Growth Trading System CLI")
     parser.add_argument("--settings", type=Path, help="Path to user settings override JSON")
@@ -606,6 +637,15 @@ def build_parser() -> argparse.ArgumentParser:
     notebook.add_argument("--dest", type=Path, default=Path("notebooks/trading_dashboard.ipynb"), help="Destination path for the notebook")
     notebook.add_argument("--force", action="store_true", help="Overwrite destination if it exists")
     notebook.set_defaults(handler=handle_notebook)
+
+    refresh = subparsers.add_parser("refresh-fundamentals", help="Refresh cached fundamentals via Alpha Vantage")
+    refresh.add_argument("--symbols", nargs="+", help="Explicit symbols to refresh")
+    refresh.add_argument("--seed-candidates", type=Path, help="CSV of candidate symbols to seed the refresh")
+    refresh.add_argument("--include-russell", action="store_true", help="Include Russell 2000 constituents when refreshing")
+    refresh.add_argument("--limit", type=int, help="Limit number of symbols to refresh")
+    refresh.add_argument("--throttle", type=float, default=12.0, help="Seconds to wait between Alpha Vantage requests (default: 12)")
+    refresh.set_defaults(handler=handle_refresh_fundamentals)
+
 
     return parser
 

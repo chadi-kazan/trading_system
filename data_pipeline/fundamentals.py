@@ -4,8 +4,10 @@ from __future__ import annotations
 
 import json
 import logging
+import time
+from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Optional
+from typing import Any, Dict, Iterable, Optional
 
 import pandas as pd
 
@@ -129,6 +131,7 @@ def load_fundamental_metrics(
         try:
             av_client = client or AlphaVantageClient(api_key)
         except ValueError:
+            LOGGER.warning("Invalid Alpha Vantage configuration provided")
             return {}
         try:
             overview = av_client.fetch_company_overview(cleaned_symbol)
@@ -142,4 +145,70 @@ def load_fundamental_metrics(
     return {}
 
 
-__all__ = ["load_fundamental_metrics"]
+def refresh_fundamentals_cache(
+    symbols: Iterable[str],
+    base_dir: Path,
+    api_key: str,
+    *,
+    client: Optional[AlphaVantageClient] = None,
+    throttle_seconds: float = 12.0,
+) -> int:
+    """Fetch fundamentals for *symbols* and write JSON cache files.
+
+    Returns the number of successfully cached symbols.
+    """
+
+    cleaned = []
+    seen: set[str] = set()
+    for symbol in symbols:
+        if not symbol:
+            continue
+        sym = symbol.upper().strip()
+        if not sym or sym in seen:
+            continue
+        seen.add(sym)
+        cleaned.append(sym)
+
+    if not cleaned:
+        return 0
+
+    if not api_key:
+        raise ValueError("Alpha Vantage API key is required to refresh fundamentals")
+
+    fundamentals_dir = base_dir / "fundamentals"
+    fundamentals_dir.mkdir(parents=True, exist_ok=True)
+
+    av_client = client or AlphaVantageClient(api_key)
+    refreshed = 0
+    for idx, symbol in enumerate(cleaned):
+        try:
+            overview = av_client.fetch_company_overview(symbol)
+        except (AlphaVantageError, Exception) as exc:  # pragma: no cover - network faults
+            LOGGER.warning("Skipping %s due to Alpha Vantage error: %s", symbol, exc)
+            continue
+
+        mapped = _map_alpha_overview(overview)
+        if not mapped:
+            LOGGER.info("Alpha Vantage returned no usable metrics for %s", symbol)
+            continue
+
+        payload = {
+            "source": "alpha_vantage",
+            "fetched_at": datetime.utcnow().isoformat(),
+            "data": mapped,
+        }
+        target = fundamentals_dir / f"{symbol}.json"
+        try:
+            target.write_text(json.dumps(payload), encoding="utf-8")
+        except OSError as exc:  # pragma: no cover - filesystem failure
+            LOGGER.error("Failed to write fundamentals cache for %s: %s", symbol, exc)
+            continue
+
+        refreshed += 1
+        if throttle_seconds > 0 and idx < len(cleaned) - 1:
+            time.sleep(throttle_seconds)
+
+    return refreshed
+
+
+__all__ = ["load_fundamental_metrics", "refresh_fundamentals_cache"]

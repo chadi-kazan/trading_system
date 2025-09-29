@@ -67,3 +67,16 @@ python main.py notebook [--template PATH] [--dest PATH] [--force]
 
 Use `--force` to overwrite an existing destination file.
 
+### refresh-fundamentals
+Download fundamentals for a batch of symbols and update the local cache.
+
+```
+python main.py refresh-fundamentals [--symbols TICKER ...] [--seed-candidates CSV]
+                                      [--include-russell] [--limit N] [--throttle SECONDS]
+```
+
+- Requires `data_sources.alpha_vantage_key` (or `TS_ALPHA_VANTAGE_KEY`) to be set.
+- Defaults to the configured seed list and can merge Russell constituents with `--include-russell`.
+- Writes JSON files under `storage.universe_dir/fundamentals/` for downstream enrichment.
+
+
