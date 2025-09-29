@@ -68,11 +68,12 @@
 ## Recent Updates (2025-09-24)
 - [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
 - [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
+- [x] Added fundamentals loader and enrichment overrides sourced from universe caches.
 
 ## Next Actions
-1. Sync documentation (`README.md`, `CLI_USAGE.md`) with the enriched data pipeline and enhanced backtesting behavior.
-2. Extend CLI regression tests to assert enriched fields are present in backtest runs.
-3. Evaluate external fundamentals feeds to replace the earnings-growth proxy and broaden the candidate universe.
+1. Automate the refresh of fundamentals caches (scheduled universe scans + validation).
+2. Prototype external fundamentals sourcing (e.g., Alpha Vantage) for richer metrics beyond cached files.
+3. Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
 
 
 ## Ongoing Governance

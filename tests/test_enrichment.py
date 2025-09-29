@@ -33,6 +33,15 @@ def test_enrich_price_frame_adds_expected_columns():
     assert np.isclose(enriched.loc[dates[-1], "earnings_growth"], expected_growth, atol=1e-6)
 
 
+
+def test_enrich_price_frame_applies_fundamentals():
+    dates = pd.date_range("2024-01-01", periods=5)
+    frame = pd.DataFrame({"close": [10, 11, 12, 13, 14], "volume": [1000, 1010, 1020, 1030, 1040]}, index=dates)
+    fundamentals = {"earnings_growth": 0.42, "relative_strength": 0.9}
+    enriched = enrich_price_frame("TEST", frame, fundamentals=fundamentals)
+    assert enriched["earnings_growth"].iloc[-1] == 0.42
+    assert enriched["relative_strength"].iloc[-1] == 0.9
+    assert enriched.attrs.get("fundamentals") is True
 def test_enrich_price_frame_handles_empty_frames():
     frame = pd.DataFrame(columns=["close", "volume"])
     enriched = enrich_price_frame("EMPTY", frame)

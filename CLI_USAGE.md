@@ -34,6 +34,7 @@ python main.py backtest [--prices CSV | --symbol TICKER] [--start YYYY-MM-DD]
 - The CLI enriches price data on the fly (relative strength, 52-week highs, volume trends) so CAN SLIM and other strategies have the columns they expect.
 - The backtesting engine sizes positions using `risk_management` settings and simulates trades with transaction costs to produce realistic equity curves.
 - `--strategies` accepts any combination of `dan_zanger`, `canslim`, `trend`, `livermore` (aliases resolved automatically).
+- If `data/universe/fundamentals/` or `fundamentals.csv` exists, those values override derived enrichment metrics during backtests.
 - When `--output-dir` is provided, performance metrics are written to `DIR/performance/` and combined results to `DIR/combined/`.
 - `--email` sends performance and attribution tables using the configured email dispatcher.
 
@@ -63,3 +64,4 @@ python main.py notebook [--template PATH] [--dest PATH] [--force]
 ```
 
 Use `--force` to overwrite an existing destination file.
+

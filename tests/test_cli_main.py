@@ -1,4 +1,5 @@
 from argparse import Namespace
+import json
 import pandas as pd
 
 from main import (
@@ -63,6 +64,7 @@ def test_build_parser_attaches_handlers():
 
 
 def test_load_price_data_for_backtest_enriches_csv(tmp_path):
+
     config = _load_config()
     path = tmp_path / "prices.csv"
     pd.DataFrame({
@@ -71,16 +73,35 @@ def test_load_price_data_for_backtest_enriches_csv(tmp_path):
         "volume": [1_000 + 10 * i for i in range(10)],
     }).to_csv(path, index=False)
 
-    args = Namespace(prices=path, symbol=None, start=None, end=None, interval="1d")
-    frame = load_price_data_for_backtest(args, config)
+    fundamentals_dir = config.storage.universe_dir / "fundamentals"
+    dir_existed = fundamentals_dir.exists()
+    fundamentals_dir.mkdir(parents=True, exist_ok=True)
+    fundamentals_path = fundamentals_dir / "PRICES.json"
 
-    expected_columns = {
-        "average_volume",
-        "volume_change",
-        "fifty_two_week_high",
-        "relative_strength",
-        "earnings_growth",
-    }
-    assert expected_columns.issubset(frame.columns)
-    assert frame.attrs.get("enriched") is True
+    try:
+        fundamentals_path.write_text(json.dumps({"earnings_growth": 0.5, "relative_strength": 0.95}))
+        args = Namespace(prices=path, symbol=None, start=None, end=None, interval="1d")
+        frame = load_price_data_for_backtest(args, config)
+
+        expected_columns = {
+            "average_volume",
+            "volume_change",
+            "fifty_two_week_high",
+            "relative_strength",
+            "earnings_growth",
+        }
+        assert expected_columns.issubset(frame.columns)
+        assert frame.attrs.get("enriched") is True
+        assert frame.attrs.get("fundamentals") is True
+        assert frame["earnings_growth"].iloc[-1] == 0.5
+        assert frame["relative_strength"].iloc[-1] == 0.95
+    finally:
+        if fundamentals_path.exists():
+            fundamentals_path.unlink()
+        if not dir_existed and fundamentals_dir.exists():
+            try:
+                fundamentals_dir.rmdir()
+            except OSError:
+                pass
+
     assert frame.attrs.get("symbol") == path.stem.upper()

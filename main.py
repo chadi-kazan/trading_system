@@ -16,7 +16,7 @@ from automation.emailer import EmailConfig as DispatcherEmailConfig, EmailDispat
 from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
-from data_pipeline.enrichment import enrich_price_frame
+from data_pipeline import enrich_price_frame, load_fundamental_metrics
 from data_providers.base import PriceRequest
 from portfolio.equity_curve import load_equity_curve
 from portfolio.health import PortfolioHealthConfig, PortfolioHealthMonitor
@@ -127,7 +127,39 @@ def load_price_data_for_backtest(args: argparse.Namespace, config: TradingSystem
         csv_path = Path(args.prices)
         frame = load_price_frame_from_csv(csv_path)
         symbol = frame.attrs.get("symbol", csv_path.stem.upper())
-        return enrich_price_frame(symbol, frame)
+        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir)
+        return enrich_price_frame(symbol, frame, fundamentals=fundamentals)
+
+    if args.symbol:
+        try:
+            from data_providers.yahoo import YahooPriceProvider
+        except ModuleNotFoundError as exc:  # pragma: no cover - dependency hint
+            raise RuntimeError(
+                "Yahoo Finance price downloads require the `yfinance` package. Install it via `pip install yfinance`."
+            ) from exc
+
+        start_date, end_date = resolve_date_range(args.start, args.end)
+        provider = YahooPriceProvider(
+            cache_dir=config.storage.price_cache_dir,
+            cache_ttl_days=config.data_sources.cache_days,
+        )
+        symbol = args.symbol.upper()
+        request = PriceRequest(
+            symbol=symbol,
+            start=start_date,
+            end=end_date,
+            interval=args.interval,
+        )
+        result = provider.get_price_history(request)
+        data = result.data.copy()
+        data.attrs["symbol"] = symbol
+        data.attrs["source"] = "yahoo"
+        data.attrs["interval"] = args.interval
+        fundamentals = load_fundamental_metrics(symbol, config.storage.universe_dir)
+        return enrich_price_frame(symbol, data, fundamentals=fundamentals)
+
+    raise ValueError("Either --prices or --symbol must be provided for backtesting")
+
 
     if args.symbol:
         try:

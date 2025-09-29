@@ -65,6 +65,7 @@ Key configuration sections:
 - **data_sources** – Caching controls for Yahoo downlinks.
 - **universe_criteria** – Market-cap, volume, float, spread, and sector filters enforced by `universe/builder.py`.
 - **storage** – Output directories for cached prices, signal archives, and portfolio snapshots.
+- **fundamentals** - Optional CSV/JSON caches under `storage.universe_dir` that override enrichment metrics (earnings growth, relative strength).
 - **automation** – Scheduling hints for future extensions; leveraged by email workflows today.
 
 **Override hierarchy:** `defaults` ? `user settings` ? `environment variables` (prefixed with `TS_`). Use `--defaults` or `--settings` with any CLI command to swap configuration files on the fly.
@@ -217,6 +218,7 @@ Open the notebook in Jupyter to explore combined equity curves, attribution cont
 | `universe/builder.py` | Fetch fundamentals, apply screen, persist CSV snapshots. | `UniverseBuilder`, `SymbolSnapshot`. |
 | `data_providers/yahoo.py` | Price history downloader with caching. | `YahooPriceProvider`. |
 | `data_pipeline/enrichment.py` | Derive relative strength, 52-week highs, and volume features for strategies. | `enrich_price_frame`. |
+| `data_pipeline/fundamentals.py` | Load cached fundamentals for enrichment overrides. | `load_fundamental_metrics`. |
 | `strategies/*` | Implement domain-specific alpha signals. | `DanZangerCupHandleStrategy`, `CanSlimStrategy`, `TrendFollowingStrategy`, `LivermoreBreakoutStrategy`. |
 | `portfolio/position_sizer.py` | Allocate capital across signals, enforces risk constraints. | `PositionSizer`. |
 | `portfolio/health.py` | Aggregate drawdown and sector diagnostics. | `PortfolioHealthMonitor`. |
@@ -268,6 +270,7 @@ Logging with `--verbose` surfaces module-level context helpful for debugging.
 5. **Enhance Notebooks** – Build custom dashboards atop the generated CSV outputs for investment committee presentations.
 
 The system is intentionally modular—adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
+
 
 
 
