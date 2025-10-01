@@ -35,6 +35,7 @@ from trading_system.config_manager import (
     EmailConfig as AppEmailConfig,
 )
 from universe.candidates import load_seed_candidates, RUSSELL_2000_PATH
+from universe.russell import refresh_russell_file, DEFAULT_RUSSELL_URL
 
 if TYPE_CHECKING:
     from data_providers.yahoo import YahooPriceProvider
@@ -588,6 +589,21 @@ def handle_refresh_fundamentals(args: argparse.Namespace, ctx: AppContext) -> in
 
 
 
+def handle_refresh_russell(args: argparse.Namespace, ctx: AppContext) -> int:
+    url = args.url or DEFAULT_RUSSELL_URL
+    dest = args.dest or (ctx.config.storage.universe_dir / "russell_2000.csv")
+
+    try:
+        count = refresh_russell_file(dest, url=url)
+    except Exception as exc:  # pragma: no cover - network faults
+        logger.error("Failed to refresh Russell 2000 list: %s", exc)
+        return 1
+
+    print(f"Saved {count} Russell symbols to {dest}")
+    return 0
+
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Small-Cap Growth Trading System CLI")
     parser.add_argument("--settings", type=Path, help="Path to user settings override JSON")
@@ -647,6 +663,11 @@ def build_parser() -> argparse.ArgumentParser:
     refresh.set_defaults(handler=handle_refresh_fundamentals)
 
 
+    russell = subparsers.add_parser("refresh-russell", help="Download the latest Russell 2000 constituents")
+    russell.add_argument("--url", help="Optional source URL for the Russell 2000 CSV")
+    russell.add_argument("--dest", type=Path, help="Destination CSV path (default: storage.universe_dir/'russell_2000.csv')")
+    russell.set_defaults(handler=handle_refresh_russell)
+
     return parser
 
 
@@ -667,6 +688,7 @@ def main(argv: Optional[Sequence[str]] = None) -> int:
 
 if __name__ == "__main__":  # pragma: no cover - CLI entry point
     raise SystemExit(main())
+
 
 
 

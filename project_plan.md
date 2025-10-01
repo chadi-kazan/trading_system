@@ -71,11 +71,13 @@
 - [x] Added fundamentals loader and enrichment overrides sourced from universe caches.
 - [x] Added Russell 2000 seeding support and CLI flag to merge constituents into scans.
 - [x] Integrated Alpha Vantage fallback when cached fundamentals are missing.
+- [x] Added CLI task to refresh Russell 2000 constituents from an external feed.
 
 ## Next Actions
 1. Automate the refresh of fundamentals caches (scheduled universe scans + validation).
-2. Build a CLI helper to refresh Russell 2000 constituents from an external provider.
-3. Add rate-limit aware retries and logging for Alpha Vantage requests.
+2. Add rate-limit aware retries and logging for Alpha Vantage requests.
+3. Document scheduling examples (cron/Task Scheduler) for the new refresh commands.
+
 
 
 

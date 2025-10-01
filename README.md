@@ -89,6 +89,7 @@ Commands:
 - `report` – Inspect previously generated CSV reports.
 - `health` – Evaluate drawdown and sector health of a portfolio snapshot.
 - `notebook` – Copy the prebuilt analysis notebook to a destination workspace.
+- `refresh-russell` - Download the latest Russell 2000 constituent list.
 
 Example help:
 ```bash

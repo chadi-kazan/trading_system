@@ -70,6 +70,17 @@ Use `--force` to overwrite an existing destination file.
 ### refresh-fundamentals
 Download fundamentals for a batch of symbols and update the local cache.
 
+### refresh-russell
+Download and store the Russell 2000 constituents.
+
+```
+python main.py refresh-russell [--url URL] [--dest CSV]
+```
+
+- Defaults to the packaged GitHub dataset and writes to `data/universe/russell_2000.csv`.
+- Combine with `refresh-fundamentals` for end-to-end automation.
+
+
 ```
 python main.py refresh-fundamentals [--symbols TICKER ...] [--seed-candidates CSV]
                                       [--include-russell] [--limit N] [--throttle SECONDS]

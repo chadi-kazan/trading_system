@@ -75,6 +75,35 @@ def test_scan_parser_supports_russell_flag():
 
 
 
+
+
+
+def test_refresh_russell_cli(monkeypatch, tmp_path):
+    parser = build_parser()
+    dest = tmp_path / "russell.csv"
+    args = parser.parse_args(["refresh-russell", "--url", "https://example.com/russell.csv", "--dest", str(dest)])
+
+    class DummyStorage:
+        universe_dir = tmp_path
+
+    ctx = AppContext(manager=None, config=SimpleNamespace(data_sources=None, storage=DummyStorage()))
+
+    captured = {}
+
+    def fake_refresh(dest_path, url):
+        captured["dest"] = dest_path
+        captured["url"] = url
+        dest_path.write_text("symbol\nABC\n")
+        return 1
+
+    monkeypatch.setattr('main.refresh_russell_file', fake_refresh)
+
+    result = args.handler(args, ctx)
+
+    assert result == 0
+    assert captured["url"] == "https://example.com/russell.csv"
+    assert captured["dest"] == dest
+    assert dest.exists()
 def test_handle_refresh_fundamentals(monkeypatch, tmp_path):
     parser = build_parser()
     args = parser.parse_args(["refresh-fundamentals", "--throttle", "0"])
