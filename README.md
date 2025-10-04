@@ -221,7 +221,7 @@ Sector breaches:
    ```
    Set `VITE_API_BASE_URL` in `.env` (or via shell) if the API runs on a non-default host/port.
 
-The dashboard supports symbol search, price/EMA charting, per-strategy confidence views, and aggregated signal summaries powered by the new backend endpoints. If the API returns HTTP 429, simply wait a few seconds before refreshing to respect Alpha Vantage throttling. Tailwind CSS powers the UI; tweak design tokens in dashboard_web/tailwind.config.ts as needed.
+The dashboard supports symbol search, price/EMA charting, per-strategy confidence views, and aggregated signal summaries powered by the new backend endpoints. If the API returns HTTP 429, simply wait a few seconds before refreshing to respect Alpha Vantage throttling. Tailwind CSS powers the UI; tweak design tokens in dashboard_web/tailwind.config.ts as needed. Explore `/guides/signals` for interpretation walkthroughs and `/guides/glossary` for definitions with Investopedia links.
 For research workflows, clone the reporting notebook via `python main.py notebook`. The command copies `notebooks/backtest_analysis_template.ipynb` to a working location (default `notebooks/trading_dashboard.ipynb`). Set `--force` to overwrite existing dashboards.
 
 Example:
@@ -319,4 +319,5 @@ The system is intentionally modular—adjust a single component (e.g., filters, ri
 
 
 \n## Cloud Deployment\n- [Cloud deployment plan](docs/cloud_deployment_plan.md): containerisation, hosting, and configuration guidance.\n
+
 

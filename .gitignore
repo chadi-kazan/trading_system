@@ -9,3 +9,6 @@ trading_env/share
 trading_env/etc
 data/prices/cache/
 data/universe/fundamentals_cache/
+.venv/
+node_modules/
+dashboard_web/node_modules/
