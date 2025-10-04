@@ -207,6 +207,21 @@ Sector breaches:
 **Investor interpretation:** A 12% drawdown triggered alerts; biotech exposure exceeds configured limits, signaling the need to rebalance. With `--email`, an alert is dispatched to the configured inbox, keeping PMs informed even when away from the terminal.
 
 ### Notebook Generation
+### Dashboard API & Frontend
+1. Start the FastAPI service (uses existing config + strategy modules):
+   ```bash
+   uvicorn dashboard_api.app:app --reload
+   ```
+   The API listens on `http://localhost:8000` by default and exposes routes under `/api`.
+2. Install web dependencies and run the React dev server:
+   ```bash
+   cd dashboard_web
+   npm install
+   npm run dev
+   ```
+   Set `VITE_API_BASE_URL` in `.env` (or via shell) if the API runs on a non-default host/port.
+
+The dashboard supports symbol search, price/EMA charting, per-strategy confidence views, and aggregated signal summaries powered by the new backend endpoints.
 For research workflows, clone the reporting notebook via `python main.py notebook`. The command copies `notebooks/backtest_analysis_template.ipynb` to a working location (default `notebooks/trading_dashboard.ipynb`). Set `--force` to overwrite existing dashboards.
 
 Example:
@@ -292,6 +307,7 @@ Logging with `--verbose` surfaces module-level context helpful for debugging.
 5. **Enhance Notebooks** – Build custom dashboards atop the generated CSV outputs for investment committee presentations.
 
 The system is intentionally modular—adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
+
 
 
 
