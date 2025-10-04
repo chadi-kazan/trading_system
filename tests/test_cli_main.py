@@ -20,6 +20,24 @@ def _load_config():
     return ConfigManager().load(force_reload=True)
 
 
+def _prepare_schedule_config(tmp_path, *, enabled=True):
+    config = _load_config()
+    storage = replace(
+        config.storage,
+        price_cache_dir=tmp_path / "prices",
+        universe_dir=tmp_path / "universe",
+        signal_dir=tmp_path / "signals",
+        portfolio_dir=tmp_path / "portfolio",
+    )
+    for directory in storage.__dict__.values():
+        directory.mkdir(parents=True, exist_ok=True)
+
+    schedule_cfg = replace(config.automation.fundamentals_refresh, enabled=enabled)
+    automation_cfg = replace(config.automation, fundamentals_refresh=schedule_cfg)
+
+    return replace(config, storage=storage, automation=automation_cfg)
+
+
 def test_instantiate_strategies_defaults_cover_all():
     config = _load_config()
     strategies = instantiate_strategies(None, config)
@@ -213,3 +231,85 @@ def test_schedule_fundamentals_cli(monkeypatch, tmp_path):
     assert captured["kwargs"]["run_once"] is True
     assert captured["kwargs"]["limit"] == 10
     assert captured["kwargs"]["max_iterations"] is None
+
+
+def test_schedule_fundamentals_cli_requires_force(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals"])
+
+    config = _prepare_schedule_config(tmp_path, enabled=False)
+    ctx = AppContext(manager=None, config=config)
+
+    called = False
+
+    def fake_run(*_args, **_kwargs):
+        nonlocal called
+        called = True
+
+    monkeypatch.setattr('main.run_scheduled_refresh', fake_run)
+
+    result = args.handler(args, ctx)
+
+    assert result == 0
+    assert called is False
+
+
+def test_schedule_fundamentals_cli_conflicting_flags(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--include-russell", "--skip-russell", "--force"])
+
+    ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
+
+    monkeypatch.setattr('main.run_scheduled_refresh', lambda *_, **__: (_ for _ in ()).throw(AssertionError("should not run")))
+
+    result = args.handler(args, ctx)
+
+    assert result == 1
+
+
+def test_schedule_fundamentals_cli_validates_throttle(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--throttle", "-1", "--force"])
+
+    ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
+
+    monkeypatch.setattr('main.run_scheduled_refresh', lambda *_, **__: (_ for _ in ()).throw(AssertionError("should not run")))
+
+    result = args.handler(args, ctx)
+
+    assert result == 1
+
+
+def test_schedule_fundamentals_cli_validates_max_iterations(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--max-iterations", "0", "--force"])
+
+    ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
+
+    monkeypatch.setattr('main.run_scheduled_refresh', lambda *_, **__: (_ for _ in ()).throw(AssertionError("should not run")))
+
+    result = args.handler(args, ctx)
+
+    assert result == 1
+
+
+def test_schedule_fundamentals_cli_passes_max_iterations(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--max-iterations", "5", "--force"])
+
+    ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
+
+    captured: dict[str, object] = {}
+
+    def fake_run(config_arg, schedule_cfg, **kwargs):
+        captured["config"] = config_arg
+        captured["schedule"] = schedule_cfg
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr('main.run_scheduled_refresh', fake_run)
+
+    result = args.handler(args, ctx)
+
+    assert result == 0
+    assert captured["config"] is ctx.config
+    assert captured["kwargs"]["max_iterations"] == 5

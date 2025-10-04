@@ -66,7 +66,7 @@
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
-## Recent Updates (2025-09-24)\n- [x] Added dashboard API caching/throttling guards and surfaced rate-limit responses (Completed: 2025-10-04).\r\n- [x] Implemented FastAPI dashboard API endpoints for symbol analysis and search (Completed: 2025-10-04).\r\n- [x] Implemented scheduled fundamentals refresh CLI with validation, configuration extensions, and docs/tests (Completed: 2025-10-04).
+## Recent Updates (2025-09-24)\n- [x] Added dashboard API caching/throttling guards and surfaced rate-limit responses (Completed: 2025-10-04).\n- [x] Expanded scheduler CLI validation tests (limits, throttle, conflict handling) (Completed: 2025-10-04).\r\n- [x] Implemented FastAPI dashboard API endpoints for symbol analysis and search (Completed: 2025-10-04).\r\n- [x] Implemented scheduled fundamentals refresh CLI with validation, configuration extensions, and docs/tests (Completed: 2025-10-04).
 - [x] Added rate-limit aware Alpha Vantage retries with enhanced logging (Completed: 2025-10-04).
 - [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
 - [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
@@ -80,7 +80,7 @@
 - [ ] Add live symbol search hitting external data sources with rate-limit safeguards and clear user feedback.
 - [ ] Design a professional, card-based dashboard layout inspired by Alpaca's trading UI (light theme, manual refresh controls, no auth).
 - [ ] Document local setup in README and capture follow-up tasks for eventual cloud hosting rollout.
-## Next Actions\r\n1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.\r\n2. Extend integration coverage for the scheduler CLI (multi-iteration and failure cases).\r\n3. Evaluate automated tests/Cypress smoke checks for the Tailwind React dashboard.\r\n
+## Next Actions\r\n1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.\r\n2. Evaluate automated tests/Cypress smoke checks for the Tailwind React dashboard.\r\n3. Draft Docker Compose + deployment artifacts for repo (build scripts, env samples).\r\n
 
 ## Ongoing Governance
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
@@ -107,6 +107,7 @@
 - [x] Implement shared data contracts, caching/throttling guards for live symbol lookups, and graceful error/loading states. (Completed: 2025-10-04; Notes: in-memory caches, Alpha Vantage throttle guard, 429 surfacing.)
 - [x] Polish UI with an Alpaca-inspired card layout, search-driven workflows, and manual refresh controls. (Completed: 2025-10-04; Notes: Tailwind CSS upgrade with React 19 visuals.)
 - [x] Update README with backend/frontend setup steps and capture follow-up task for eventual cloud deployment. (Completed: 2025-10-04; Notes: README sections + Cloud deployment doc).
+
 
 
 
