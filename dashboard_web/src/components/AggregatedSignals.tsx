@@ -8,27 +8,39 @@ interface AggregatedSignalsProps {
 export function AggregatedSignals({ signals }: AggregatedSignalsProps) {
   if (signals.length === 0) {
     return (
-      <div className="panel">
-        <h2>Aggregated Signals</h2>
-        <p style={{ color: "#6b7280" }}>No aggregated signals yet.</p>
-      </div>
+      <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+        <h2 className="text-base font-semibold text-slate-900">Aggregated Signals</h2>
+        <p className="mt-3 rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-5 text-center text-sm text-slate-500">
+          No aggregated signals yet. Trigger strategy alignment to see consensus entries.
+        </p>
+      </section>
     );
   }
 
   return (
-    <div className="panel">
-      <h2>Aggregated Signals</h2>
-      <ul style={{ listStyle: "none", padding: 0, margin: 0 }}>
+    <section className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+      <h2 className="text-base font-semibold text-slate-900">Aggregated Signals</h2>
+      <ul className="mt-4 space-y-3">
         {signals.map((signal, index) => (
-          <li key={`${signal.date}-${index}`} style={{ padding: "0.6rem 0", borderBottom: "1px solid #e5e7eb" }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-              <span style={{ fontWeight: 600 }}>{signal.signal_type}</span>
-              <span style={{ color: "#6b7280" }}>{format(new Date(signal.date), "PPpp")}</span>
+          <li
+            key={`${signal.date}-${index}`}
+            className="flex flex-col gap-1 rounded-xl border border-slate-100 bg-slate-50/80 px-4 py-3 text-sm text-slate-700"
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-sm font-semibold uppercase tracking-wide text-slate-800">
+                {signal.signal_type}
+              </span>
+              <span className="text-xs font-medium text-slate-500">
+                {format(new Date(signal.date), "PPpp")}
+              </span>
             </div>
-            <div style={{ fontSize: "0.9rem", color: "#4b5563" }}>Confidence: {signal.confidence.toFixed(2)}</div>
+            <div className="flex items-center justify-between text-xs text-slate-500">
+              <span>Confidence</span>
+              <span className="font-semibold text-slate-700">{signal.confidence.toFixed(2)}</span>
+            </div>
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 }

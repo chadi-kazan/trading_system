@@ -80,7 +80,7 @@
 - [ ] Add live symbol search hitting external data sources with rate-limit safeguards and clear user feedback.
 - [ ] Design a professional, card-based dashboard layout inspired by Alpaca's trading UI (light theme, manual refresh controls, no auth).
 - [ ] Document local setup in README and capture follow-up tasks for eventual cloud hosting rollout.
-## Next Actions\r\n1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.\r\n2. Polish the dashboard UI layout (Alpaca-inspired cards, fine-tune colours/spacing).\r\n3. Extend integration coverage for the scheduler CLI (multi-iteration and failure cases).\r\n
+## Next Actions\r\n1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.\r\n2. Draft a cloud deployment plan for the FastAPI + React dashboard (containerisation, hosting targets, env config).\r\n3. Extend integration coverage for the scheduler CLI (multi-iteration and failure cases).\r\n
 
 ## Ongoing Governance
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
@@ -105,8 +105,10 @@
 - [x] Scaffold dedicated FastAPI service layer exposing REST endpoints for strategy summaries, signal breakdowns, and price overlays. (Completed: 2025-10-04; Notes: FastAPI app with search + analysis endpoints and service orchestration.)
 - [x] Build React SPA (Vite + TypeScript) consuming the API and rendering Recharts-based visualisations for key strategies. (Completed: 2025-10-04; Notes: Vite shell with search, price chart, strategy cards, aggregated signals.)
 - [x] Implement shared data contracts, caching/throttling guards for live symbol lookups, and graceful error/loading states. (Completed: 2025-10-04; Notes: in-memory caches, Alpha Vantage throttle guard, 429 surfacing.)
-- [ ] Polish UI with an Alpaca-inspired card layout, search-driven workflows, and manual refresh controls.
+- [x] Polish UI with an Alpaca-inspired card layout, search-driven workflows, and manual refresh controls. (Completed: 2025-10-04; Notes: Tailwind CSS upgrade with React 19 visuals.)
 - [ ] Update README with backend/frontend setup steps and capture follow-up task for eventual cloud deployment.
+
+
 
 
 

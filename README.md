@@ -221,7 +221,7 @@ Sector breaches:
    ```
    Set `VITE_API_BASE_URL` in `.env` (or via shell) if the API runs on a non-default host/port.
 
-The dashboard supports symbol search, price/EMA charting, per-strategy confidence views, and aggregated signal summaries powered by the new backend endpoints. If the API returns HTTP 429, simply wait a few seconds before refreshing to respect Alpha Vantage throttling.
+The dashboard supports symbol search, price/EMA charting, per-strategy confidence views, and aggregated signal summaries powered by the new backend endpoints. If the API returns HTTP 429, simply wait a few seconds before refreshing to respect Alpha Vantage throttling. Tailwind CSS powers the UI; tweak design tokens in dashboard_web/tailwind.config.ts as needed.
 For research workflows, clone the reporting notebook via `python main.py notebook`. The command copies `notebooks/backtest_analysis_template.ipynb` to a working location (default `notebooks/trading_dashboard.ipynb`). Set `--force` to overwrite existing dashboards.
 
 Example:
@@ -307,6 +307,7 @@ Logging with `--verbose` surfaces module-level context helpful for debugging.
 5. **Enhance Notebooks** – Build custom dashboards atop the generated CSV outputs for investment committee presentations.
 
 The system is intentionally modular—adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
+
 
 
 
