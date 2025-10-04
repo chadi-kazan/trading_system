@@ -27,8 +27,8 @@ Every capability is orchestrated by `main.py`, which exposes a cohesive CLI whil
 5. [Architecture & Module Overview](#architecture--module-overview)
 6. [Testing & Quality Assurance](#testing--quality-assurance)
 7. [Troubleshooting & FAQ](#troubleshooting--faq)
-8. [Next Steps](#next-steps)
-
+8. [Cloud Deployment](#cloud-deployment)
+9. [Next Steps](#next-steps)
 ---
 
 ## Prerequisites & Installation
@@ -317,4 +317,6 @@ The system is intentionally modular—adjust a single component (e.g., filters, ri
 
 
 
+
+\n## Cloud Deployment\n- [Cloud deployment plan](docs/cloud_deployment_plan.md): containerisation, hosting, and configuration guidance.\n
 
