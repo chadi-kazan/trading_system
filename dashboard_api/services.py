@@ -3,8 +3,9 @@
 from __future__ import annotations
 
 import logging
+import time
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional
+from typing import Any, Dict, Iterable, List, Optional, Tuple
 
 import pandas as pd
 
@@ -35,6 +36,10 @@ from .schemas import (
 LOGGER = logging.getLogger(__name__)
 
 
+class RateLimitError(RuntimeError):
+    """Raised when a request is throttled to protect upstream providers."""
+
+
 class SignalService:
     """High-level orchestration for symbol analysis and search."""
 
@@ -62,6 +67,15 @@ class SignalService:
         else:
             self.alpha_client = None
 
+        self.analysis_cache_ttl_seconds: float = 300.0
+        self.analysis_throttle_seconds: float = 10.0
+        self.search_cache_ttl_seconds: float = 300.0
+        self.search_throttle_seconds: float = 1.0
+        self._analysis_cache: Dict[Tuple[str, str, str, str], Tuple[float, SymbolAnalysisResponse]] = {}
+        self._analysis_last_fetch: Dict[Tuple[str, str, str, str], float] = {}
+        self._search_cache: Dict[str, Tuple[float, List[SymbolSearchResult]]] = {}
+        self._last_search_ts: float = 0.0
+
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
@@ -84,22 +98,31 @@ class SignalService:
         if not text:
             return []
 
-        results: List[Dict[str, Any]] = []
-        if self.alpha_client is not None:
+        key = text.lower()
+        now = time.time()
+        cached = self._search_cache.get(key)
+        if cached and now - cached[0] <= self.search_cache_ttl_seconds:
+            LOGGER.debug("Serving cached search results for '%s'", text)
+            return [result.model_copy() for result in cached[1]]
+
+        items: List[Dict[str, Any]] = []
+        if self.alpha_client is not None and now - self._last_search_ts >= self.search_throttle_seconds:
+            self._last_search_ts = now
             try:
-                results = self.alpha_client.search_symbols(text, max_results=max_results)
+                items = self.alpha_client.search_symbols(text, max_results=max_results)
             except AlphaVantageError as exc:
                 LOGGER.warning("Alpha Vantage search failed for '%s': %s", text, exc)
-        else:
+        elif self.alpha_client is None:
             LOGGER.debug("Alpha Vantage key unavailable; skipping external search for '%s'", text)
+        else:
+            LOGGER.debug("Throttling Alpha Vantage search for '%s'", text)
 
-        # Fallback to local symbols when the external search failed or returned nothing.
-        if not results:
+        if not items:
             from universe.candidates import load_seed_candidates
 
             candidates = load_seed_candidates()
             filtered = [symbol for symbol in candidates if text.upper() in symbol]
-            results = [
+            items = [
                 {
                     "symbol": symbol,
                     "name": symbol,
@@ -110,7 +133,9 @@ class SignalService:
                 for symbol in filtered[:max_results]
             ]
 
-        return [SymbolSearchResult(**item) for item in results]
+        results = [SymbolSearchResult(**item) for item in items]
+        self._search_cache[key] = (time.time(), results)
+        return [result.model_copy() for result in results]
 
     def get_symbol_analysis(
         self,
@@ -125,6 +150,18 @@ class SignalService:
             raise ValueError("Symbol must not be empty")
         if start > end:
             raise ValueError("Start date must be on or before end date")
+
+        cache_key = self._analysis_cache_key(cleaned_symbol, start, end, interval)
+        cached = self._get_cached_analysis(cache_key)
+        if cached is not None:
+            LOGGER.debug("Serving cached analysis for %s", cleaned_symbol)
+            return cached
+
+        now = time.time()
+        last_fetch = self._analysis_last_fetch.get(cache_key)
+        if last_fetch and now - last_fetch < self.analysis_throttle_seconds:
+            raise RateLimitError("Please wait before requesting another update for this symbol.")
+        self._analysis_last_fetch[cache_key] = now
 
         price_request = PriceRequest(symbol=cleaned_symbol, start=start, end=end, interval=interval)
         price_result = self.price_provider.get_price_history(price_request)
@@ -169,7 +206,7 @@ class SignalService:
 
         prices = [self._to_price_bar(idx, row) for idx, row in enriched.iterrows()]
 
-        return SymbolAnalysisResponse(
+        analysis = SymbolAnalysisResponse(
             symbol=cleaned_symbol,
             start=start,
             end=end,
@@ -178,6 +215,8 @@ class SignalService:
             strategies=strategy_payloads,
             aggregated_signals=aggregated_signals,
         )
+        self._store_analysis(cache_key, analysis)
+        return analysis
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -249,6 +288,28 @@ class SignalService:
             confidence=float(signal.confidence),
             metadata=_normalise_metadata(signal.metadata),
         )
+
+    def _analysis_cache_key(
+        self,
+        symbol: str,
+        start: date,
+        end: date,
+        interval: str,
+    ) -> Tuple[str, str, str, str]:
+        return (symbol, start.isoformat(), end.isoformat(), interval)
+
+    def _get_cached_analysis(self, key: Tuple[str, str, str, str]) -> Optional[SymbolAnalysisResponse]:
+        entry = self._analysis_cache.get(key)
+        if entry is None:
+            return None
+        timestamp, model = entry
+        if time.time() - timestamp > self.analysis_cache_ttl_seconds:
+            self._analysis_cache.pop(key, None)
+            return None
+        return model.model_copy()
+
+    def _store_analysis(self, key: Tuple[str, str, str, str], analysis: SymbolAnalysisResponse) -> None:
+        self._analysis_cache[key] = (time.time(), analysis)
 
     @staticmethod
     def _to_price_bar(index: Any, row: pd.Series) -> PriceBar:
@@ -329,5 +390,6 @@ def _normalise_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     return normalised
 
 
-__all__ = ["SignalService"]
+__all__ = ["SignalService", "RateLimitError"]
+
 
