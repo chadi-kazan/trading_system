@@ -101,6 +101,101 @@ class AlphaVantageClient:
         raise AlphaVantageError(f"Failed to fetch overview for {symbol}")
 
     # ------------------------------------------------------------------
+    def search_symbols(
+        self,
+        keywords: str,
+        *,
+        max_results: int = 10,
+    ) -> list[dict[str, Any]]:
+        """Return search matches for *keywords* using Alpha Vantage SYMBOL_SEARCH."""
+
+        query = (keywords or "").strip()
+        if not query:
+            return []
+
+        params = {
+            "function": "SYMBOL_SEARCH",
+            "keywords": query,
+            "apikey": self.api_key,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self.session.get(self.base_url, params=params, timeout=15)
+                response.raise_for_status()
+                payload = response.json()
+            except requests.HTTPError as exc:  # pragma: no cover - network/HTTP errors
+                resp = exc.response
+                if resp is not None and resp.status_code == 429:
+                    wait_seconds = self._retry_after_seconds(resp.headers)
+                    self._handle_rate_limit(query, attempt, wait_seconds, detail="HTTP 429 response")
+                    last_exc = exc
+                    continue
+
+                last_exc = exc
+                LOGGER.warning(
+                    "Alpha Vantage HTTP error during symbol search '%s' (attempt %s/%s): %s",
+                    query,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+            except Exception as exc:  # pragma: no cover - network/JSON errors
+                last_exc = exc
+                LOGGER.warning(
+                    "Alpha Vantage symbol search failed for '%s' (attempt %s/%s): %s",
+                    query,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+            else:
+                if not isinstance(payload, dict):
+                    raise AlphaVantageError("Unexpected symbol search payload format")
+
+                note = payload.get("Note")
+                if note:
+                    self._handle_rate_limit(query, attempt, None, detail=note)
+                    last_exc = AlphaVantageError(note)
+                    continue
+
+                matches = payload.get("bestMatches") or []
+                normalised: list[dict[str, Any]] = []
+                for match in matches:
+                    symbol = (match.get("1. symbol") or "").strip()
+                    if not symbol:
+                        continue
+                    try:
+                        score = float(match.get("9. matchScore", 0) or 0)
+                    except (TypeError, ValueError):  # pragma: no cover - bad score
+                        score = 0.0
+                    normalised.append(
+                        {
+                            "symbol": symbol,
+                            "name": (match.get("2. name") or "").strip(),
+                            "type": (match.get("3. type") or "").strip(),
+                            "region": (match.get("4. region") or "").strip(),
+                            "market_open": (match.get("5. marketOpen") or "").strip(),
+                            "market_close": (match.get("6. marketClose") or "").strip(),
+                            "timezone": (match.get("7. timezone") or "").strip(),
+                            "currency": (match.get("8. currency") or "").strip(),
+                            "match_score": score,
+                        }
+                    )
+
+                if max_results > 0:
+                    normalised = normalised[:max_results]
+                return normalised
+
+            if attempt < self.max_retries and self.backoff_seconds:
+                self._sleep(self.backoff_seconds)
+
+        if last_exc:
+            raise AlphaVantageError(f"Failed to search symbols for '{query}'") from last_exc
+        raise AlphaVantageError(f"Failed to search symbols for '{query}'")
+
+
     def _handle_rate_limit(
         self,
         symbol: str,
@@ -143,3 +238,6 @@ class AlphaVantageClient:
 
 
 __all__ = ["AlphaVantageClient", "AlphaVantageError"]
+
+
+

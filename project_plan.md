@@ -5,8 +5,9 @@
 - Prioritize incremental delivery: working data access and filtering before advanced analytics.
 - Maintain reliability through caching, error handling, and repeatable configuration.
 - Validate each component with focused tests or dry-run scripts before integration.
-- After every feature implementation suggest a git commit message that i can use to commit the files you changed.
-- Update the README.md file if necessary to document new patterns/usage after every implementation. 
+- After every feature implementation suggest a git commit command that i can copy to commit the files you changed.
+- Update the README.md file if necessary to document new patterns/usage after every implementation.
+- constantly review and update the project plan to add new tasks to it and refine the requirements as i give you instructions. add any instructions i give you here as well when required.
 
 ## Phase 0: Planning & Baseline
 - [x] ~~Review instructions and capture key constraints (Deliverable: notes in this plan; Completed: 2025-09-21).~~
@@ -65,8 +66,7 @@
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
-## Recent Updates (2025-09-24)
-- [x] Implemented scheduled fundamentals refresh CLI with validation, configuration extensions, and docs/tests (Completed: 2025-10-04).
+## Recent Updates (2025-09-24)\r\n- [x] Implemented FastAPI dashboard API endpoints for symbol analysis and search (Completed: 2025-10-04).\r\n- [x] Implemented scheduled fundamentals refresh CLI with validation, configuration extensions, and docs/tests (Completed: 2025-10-04).
 - [x] Added rate-limit aware Alpha Vantage retries with enhanced logging (Completed: 2025-10-04).
 - [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
 - [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
@@ -75,18 +75,28 @@
 - [x] Integrated Alpha Vantage fallback when cached fundamentals are missing.
 - [x] Added CLI task to refresh Russell 2000 constituents from an external feed.
 
+## Further Enhancements
+- [ ] Build a web dashboard served by a dedicated FastAPI backend that exposes trading signals via a REST API and a React frontend using Recharts for interactive strategy visualisations.
+- [ ] Add live symbol search hitting external data sources with rate-limit safeguards and clear user feedback.
+- [ ] Design a professional, card-based dashboard layout inspired by Alpaca's trading UI (light theme, manual refresh controls, no auth).
+- [ ] Document local setup in README and capture follow-up tasks for eventual cloud hosting rollout.
 ## Next Actions
 1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.
-2. Add optional email summaries after scheduled fundamentals refresh cycles.
+2. Scaffold the React frontend shell and wire it to the new API for initial data fetches.
 3. Extend integration coverage for the scheduler CLI (multi-iteration and failure cases).
-
-
 
 
 ## Ongoing Governance
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+
+
+
+
+
+
+
 
 
 
