@@ -66,6 +66,8 @@
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
 ## Recent Updates (2025-09-24)
+- [x] Implemented scheduled fundamentals refresh CLI with validation, configuration extensions, and docs/tests (Completed: 2025-10-04).
+- [x] Added rate-limit aware Alpha Vantage retries with enhanced logging (Completed: 2025-10-04).
 - [x] Upgraded the backtesting engine to simulate trades with transaction costs and added regression coverage.
 - [x] Introduced price-data enrichment to backfill CAN SLIM inputs from OHLCV series and wired it into the CLI backtest flow.
 - [x] Added fundamentals loader and enrichment overrides sourced from universe caches.
@@ -74,15 +76,15 @@
 - [x] Added CLI task to refresh Russell 2000 constituents from an external feed.
 
 ## Next Actions
-1. Automate the refresh of fundamentals caches (scheduled universe scans + validation).
-2. Add rate-limit aware retries and logging for Alpha Vantage requests.
-3. Document scheduling examples (cron/Task Scheduler) for the new refresh commands.
+1. Monitor the first scheduled fundamentals run and review validation logs for anomalies.
+2. Add optional email summaries after scheduled fundamentals refresh cycles.
+3. Extend integration coverage for the scheduler CLI (multi-iteration and failure cases).
 
 
 
 
 ## Ongoing Governance
-- [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-09-24)
+- [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
 

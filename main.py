@@ -13,6 +13,10 @@ from typing import TYPE_CHECKING, Callable, Dict, Iterable, List, Optional, Sequ
 import pandas as pd
 
 from automation.emailer import EmailConfig as DispatcherEmailConfig, EmailDispatcher
+from automation.fundamentals_refresh import (
+    ValidationError as FundamentalsValidationError,
+    run_scheduled_refresh,
+)
 from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
@@ -587,6 +591,56 @@ def handle_refresh_fundamentals(args: argparse.Namespace, ctx: AppContext) -> in
     print(f"Cached fundamentals for {refreshed} symbols")
     return 0
 
+def handle_schedule_fundamentals(args: argparse.Namespace, ctx: AppContext) -> int:
+    schedule_cfg = ctx.config.automation.fundamentals_refresh
+    if not schedule_cfg.enabled and not args.force:
+        logger.info("Fundamentals refresh automation is disabled in configuration; use --force to run anyway.")
+        return 0
+
+    if args.include_russell and args.skip_russell:
+        logger.error("Cannot specify both --include-russell and --skip-russell.")
+        return 1
+
+    include_russell = schedule_cfg.include_russell
+    if args.include_russell:
+        include_russell = True
+    if args.skip_russell:
+        include_russell = False
+
+    if args.throttle is not None and args.throttle < 0:
+        logger.error("Throttle must be non-negative")
+        return 1
+
+    limit = args.limit if args.limit and args.limit > 0 else None
+
+    if args.max_iterations is not None and args.max_iterations <= 0:
+        logger.error("max-iterations must be greater than zero")
+        return 1
+
+    seed_path = Path(args.seed_candidates) if args.seed_candidates else None
+
+    try:
+        run_scheduled_refresh(
+            ctx.config,
+            schedule_cfg,
+            run_once=args.run_once,
+            max_iterations=args.max_iterations,
+            seed_path=seed_path,
+            include_russell=include_russell,
+            limit=limit,
+            throttle=args.throttle,
+        )
+    except FundamentalsValidationError as exc:
+        logger.error("Fundamentals validation failed: %s", exc)
+        return 1
+    except ValueError as exc:
+        logger.error(str(exc))
+        return 1
+    except Exception as exc:  # pylint: disable=broad-except
+        logger.exception("Unexpected error while running fundamentals scheduler: %s", exc)
+        return 1
+
+    return 0
 
 
 def handle_refresh_russell(args: argparse.Namespace, ctx: AppContext) -> int:
@@ -601,6 +655,48 @@ def handle_refresh_russell(args: argparse.Namespace, ctx: AppContext) -> int:
 
     print(f"Saved {count} Russell symbols to {dest}")
     return 0
+
+
+
+def handle_refresh_datasets(args: argparse.Namespace, ctx: AppContext) -> int:
+    api_key = ctx.config.data_sources.alpha_vantage_key
+    if not api_key:
+        logger.error("Alpha Vantage API key not configured; set data_sources.alpha_vantage_key or TS_ALPHA_VANTAGE_KEY.")
+        return 1
+
+    status = 0
+    if not args.skip_russell:
+        url = args.russell_url or DEFAULT_RUSSELL_URL
+        dest = args.russell_dest or (ctx.config.storage.universe_dir / 'russell_2000.csv')
+        try:
+            count = refresh_russell_file(dest, url=url)
+            logger.info("Refreshed Russell 2000 list (%s symbols)", count)
+        except Exception as exc:  # pragma: no cover - network faults
+            logger.error("Failed to refresh Russell 2000 list: %s", exc)
+            status = 1
+
+    seed_path = Path(args.seed_candidates) if args.seed_candidates else None
+    extra_sources: list[Path] = []
+    include_russell = args.include_russell or (not args.skip_russell)
+    if include_russell:
+        extra_sources.append(RUSSELL_2000_PATH)
+
+    symbols = load_seed_candidates(seed_path, extra_sources=extra_sources)
+    if args.symbols:
+        manual = [sym.strip().upper() for sym in args.symbols if sym]
+        symbols = list(dict.fromkeys(manual + symbols))
+
+    if args.limit and args.limit > 0:
+        symbols = symbols[: args.limit]
+
+    refreshed = refresh_fundamentals_cache(
+        symbols=symbols,
+        base_dir=ctx.config.storage.universe_dir,
+        api_key=api_key,
+        throttle_seconds=args.throttle,
+    )
+    print(f"Cached fundamentals for {refreshed} symbols")
+    return status
 
 
 
@@ -668,8 +764,30 @@ def build_parser() -> argparse.ArgumentParser:
     russell.add_argument("--dest", type=Path, help="Destination CSV path (default: storage.universe_dir/'russell_2000.csv')")
     russell.set_defaults(handler=handle_refresh_russell)
 
-    return parser
 
+    datasets = subparsers.add_parser("refresh-datasets", help="Refresh Russell constituents and fundamentals cache")
+    datasets.add_argument("--symbols", nargs="+", help="Explicit symbols to refresh for fundamentals")
+    datasets.add_argument("--seed-candidates", type=Path, help="CSV of candidate symbols to seed the refresh")
+    datasets.add_argument("--include-russell", action="store_true", help="Include Russell 2000 constituents when refreshing fundamentals")
+    datasets.add_argument("--limit", type=int, help="Limit number of symbols to refresh")
+    datasets.add_argument("--throttle", type=float, default=12.0, help="Seconds to wait between Alpha Vantage requests (default: 12)")
+    datasets.add_argument("--russell-url", help="Alternate source URL for the Russell 2000 CSV")
+    datasets.add_argument("--russell-dest", type=Path, help="Destination CSV path (default: storage.universe_dir/'russell_2000.csv')")
+    datasets.add_argument("--skip-russell", action="store_true", help="Skip downloading the Russell 2000 list")
+    datasets.set_defaults(handler=handle_refresh_datasets)
+
+    schedule = subparsers.add_parser("schedule-fundamentals", help="Run scheduled fundamentals refresh automation")
+    schedule.add_argument("--seed-candidates", type=Path, help="Optional seed candidates CSV override")
+    schedule.add_argument("--include-russell", action="store_true", help="Include Russell 2000 constituents for refresh regardless of config")
+    schedule.add_argument("--skip-russell", action="store_true", help="Exclude Russell 2000 constituents even if enabled in config")
+    schedule.add_argument("--limit", type=int, help="Override the maximum number of symbols refreshed per cycle")
+    schedule.add_argument("--throttle", type=float, help="Override the Alpha Vantage throttle (seconds)")
+    schedule.add_argument("--run-once", action="store_true", help="Run a single refresh cycle immediately and exit")
+    schedule.add_argument("--max-iterations", type=int, help="Limit the number of scheduled cycles before exiting")
+    schedule.add_argument("--force", action="store_true", help="Run even if automation is disabled in the configuration")
+    schedule.set_defaults(handler=handle_schedule_fundamentals)
+
+    return parser
 
 
 def main(argv: Optional[Sequence[str]] = None) -> int:

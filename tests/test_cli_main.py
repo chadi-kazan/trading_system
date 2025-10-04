@@ -1,4 +1,5 @@
 from argparse import Namespace
+from dataclasses import replace
 from types import SimpleNamespace
 import json
 import pandas as pd
@@ -177,3 +178,38 @@ def test_load_price_data_for_backtest_enriches_csv(tmp_path):
                 pass
 
     assert frame.attrs.get("symbol") == path.stem.upper()
+
+def test_schedule_fundamentals_cli(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--run-once", "--limit", "10", "--force"])
+
+    config = _load_config()
+    storage = replace(
+        config.storage,
+        price_cache_dir=tmp_path / "prices",
+        universe_dir=tmp_path / "universe",
+        signal_dir=tmp_path / "signals",
+        portfolio_dir=tmp_path / "portfolio",
+    )
+    for directory in storage.__dict__.values():
+        directory.mkdir(parents=True, exist_ok=True)
+    config = replace(config, storage=storage)
+
+    ctx = AppContext(manager=None, config=config)
+
+    captured: dict[str, object] = {}
+
+    def fake_run(config_arg, schedule_cfg, **kwargs):
+        captured["config"] = config_arg
+        captured["schedule"] = schedule_cfg
+        captured["kwargs"] = kwargs
+
+    monkeypatch.setattr('main.run_scheduled_refresh', fake_run)
+
+    result = args.handler(args, ctx)
+
+    assert result == 0
+    assert captured["config"] is config
+    assert captured["kwargs"]["run_once"] is True
+    assert captured["kwargs"]["limit"] == 10
+    assert captured["kwargs"]["max_iterations"] is None

@@ -70,6 +70,15 @@ Use `--force` to overwrite an existing destination file.
 ### refresh-fundamentals
 Download fundamentals for a batch of symbols and update the local cache.
 
+```
+python main.py refresh-fundamentals [--symbols TICKER ...] [--seed-candidates CSV]
+                                      [--include-russell] [--limit N] [--throttle SECONDS]
+```
+
+- Requires `data_sources.alpha_vantage_key` (or `TS_ALPHA_VANTAGE_KEY`).
+- Defaults to the configured seed list and can merge Russell constituents with `--include-russell`.
+- Writes JSON files under `storage.universe_dir/fundamentals/` for downstream enrichment.
+
 ### refresh-russell
 Download and store the Russell 2000 constituents.
 
@@ -78,16 +87,19 @@ python main.py refresh-russell [--url URL] [--dest CSV]
 ```
 
 - Defaults to the packaged GitHub dataset and writes to `data/universe/russell_2000.csv`.
-- Combine with `refresh-fundamentals` for end-to-end automation.
+- Combine with `refresh-fundamentals` or the scheduler for end-to-end automation.
 
+### schedule-fundamentals
+Run the scheduled fundamentals refresh loop defined in `automation.fundamentals_refresh`.
 
 ```
-python main.py refresh-fundamentals [--symbols TICKER ...] [--seed-candidates CSV]
-                                      [--include-russell] [--limit N] [--throttle SECONDS]
+python main.py schedule-fundamentals [--run-once] [--max-iterations N]
+                                     [--seed-candidates CSV]
+                                     [--include-russell | --skip-russell]
+                                     [--limit N] [--throttle SECONDS] [--force]
 ```
 
-- Requires `data_sources.alpha_vantage_key` (or `TS_ALPHA_VANTAGE_KEY`) to be set.
-- Defaults to the configured seed list and can merge Russell constituents with `--include-russell`.
-- Writes JSON files under `storage.universe_dir/fundamentals/` for downstream enrichment.
-
-
+- The command loops until interrupted, respecting the configured frequency, time, day, and validation thresholds.
+- Use `--run-once` when an external scheduler (cron/Task Scheduler) invokes the command and you want it to exit after one cycle.
+- `--force` overrides a disabled automation toggle in config for ad-hoc runs.
+- `--max-iterations` limits the number of refresh cycles when running interactively.

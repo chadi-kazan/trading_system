@@ -65,6 +65,21 @@
     "scan_day": "sunday",
     "scan_time": "21:00",
     "timezone": "US/Eastern",
-    "send_reports": true
+    "send_reports": true,
+    "fundamentals_refresh": {
+      "enabled": true,
+      "frequency": "daily",
+      "time": "22:30",
+      "include_russell": true,
+      "limit": 200,
+      "throttle": 12.0,
+      "validation": {
+        "enabled": true,
+        "sample_size": 80,
+        "min_universe_size": 15,
+        "persist_snapshot": true,
+        "fail_on_breach": true
+      }
+    }
   }
 }

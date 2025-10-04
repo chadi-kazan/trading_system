@@ -68,6 +68,7 @@ class UniverseBuilder:
         self.universe_dir.mkdir(parents=True, exist_ok=True)
         self._ticker_factory = ticker_factory or yf.Ticker
         self._last_skipped: list[str] = []
+        self._last_snapshot_path: Path | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -84,6 +85,7 @@ class UniverseBuilder:
         snapshots: List[SymbolSnapshot] = []
         skipped_errors: list[str] = []
         skipped_missing: list[str] = []
+        self._last_snapshot_path = None
         for raw_symbol in symbols:
             symbol = raw_symbol.strip().upper()
             if not symbol:
@@ -116,6 +118,7 @@ class UniverseBuilder:
             filename = self._universe_filename(as_of)
             screened.to_csv(filename, index=False)
             LOGGER.info("Universe snapshot saved to %s", filename)
+            self._last_snapshot_path = filename
 
         return screened
 
@@ -125,6 +128,10 @@ class UniverseBuilder:
     def last_skipped_symbols(self) -> List[str]:
         """Return symbols skipped during the most recent build."""
         return list(self._last_skipped)
+
+    def last_snapshot_path(self) -> Path | None:
+        """Return the path written during the most recent persisted build."""
+        return self._last_snapshot_path
 
 
     def _universe_filename(self, as_of: date) -> Path:

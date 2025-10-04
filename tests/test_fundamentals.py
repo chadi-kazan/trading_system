@@ -53,3 +53,76 @@ def test_load_fundamental_metrics_alpha_vantage(monkeypatch: pytest.MonkeyPatch,
     assert metrics["earnings_growth"] == 0.35
     assert metrics["relative_strength"] == pytest.approx(0.5)
     assert metrics["market_cap"] == 123456789.0
+
+
+def test_alpha_vantage_client_retries(monkeypatch):
+    from data_pipeline.alpha_vantage_client import AlphaVantageClient
+
+    class DummyResponse:
+        def __init__(self, payload, status=200):
+            self._payload = payload
+            self.status_code = status
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                raise RuntimeError('http error')
+
+        def json(self):
+            return self._payload
+
+    class DummySession:
+        def __init__(self):
+            self.calls = 0
+
+        def get(self, url, params, timeout):
+            self.calls += 1
+            if self.calls == 1:
+                return DummyResponse({'Note': 'Please slow down'})
+            return DummyResponse({'QuarterlyEarningsGrowthYOY': '0.2'})
+
+    sleeps: list[float] = []
+    monkeypatch.setattr('time.sleep', lambda seconds: sleeps.append(seconds))
+
+    client = AlphaVantageClient('demo', session=DummySession(), max_retries=2, backoff_seconds=0, rate_limit_sleep=0.5)
+    data = client.fetch_company_overview('ABC')
+
+    assert data['QuarterlyEarningsGrowthYOY'] == '0.2'
+    assert sleeps and pytest.approx(sleeps[0], rel=1e-6) == 0.5
+
+def test_alpha_vantage_client_handles_http_rate_limit(monkeypatch):
+    import requests
+    from data_pipeline.alpha_vantage_client import AlphaVantageClient
+
+    sleeps: list[float] = []
+    monkeypatch.setattr('time.sleep', lambda seconds: sleeps.append(seconds))
+
+    class DummyResponse:
+        def __init__(self, status_code: int, payload: dict[str, str] | None = None, headers: dict[str, str] | None = None):
+            self.status_code = status_code
+            self._payload = payload or {}
+            self.headers = headers or {}
+
+        def raise_for_status(self):
+            if self.status_code >= 400:
+                error = requests.HTTPError('rate limited')
+                error.response = self
+                raise error
+
+        def json(self):
+            return self._payload
+
+    class DummySession:
+        def __init__(self):
+            self.calls = 0
+
+        def get(self, url, params, timeout):  # pragma: no cover - simple shim
+            self.calls += 1
+            if self.calls == 1:
+                return DummyResponse(429, headers={'Retry-After': '2'})
+            return DummyResponse(200, payload={'QuarterlyEarningsGrowthYOY': '0.3'})
+
+    client = AlphaVantageClient('demo', session=DummySession(), max_retries=2, backoff_seconds=0, rate_limit_sleep=1)
+    data = client.fetch_company_overview('ABC')
+
+    assert data['QuarterlyEarningsGrowthYOY'] == '0.3'
+    assert sleeps and pytest.approx(sleeps[0], rel=1e-6) == 2.0

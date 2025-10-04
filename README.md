@@ -67,7 +67,7 @@ Key configuration sections:
 - **universe_criteria** – Market-cap, volume, float, spread, and sector filters enforced by `universe/builder.py`.
 - **storage** – Output directories for cached prices, signal archives, and portfolio snapshots.
 - **fundamentals** - Optional CSV/JSON caches under `storage.universe_dir` that override enrichment metrics (earnings growth, relative strength).
-- **automation** – Scheduling hints for future extensions; leveraged by email workflows today.
+- **automation** - Houses scan scheduling plus `fundamentals_refresh` options (frequency, time/day, Russell merge flags, validation thresholds) consumed by the automation CLI.
 
 **Override hierarchy:** `defaults` ? `user settings` ? `environment variables` (prefixed with `TS_`). Use `--defaults` or `--settings` with any CLI command to swap configuration files on the fly.
 
@@ -89,6 +89,8 @@ Commands:
 - `report` – Inspect previously generated CSV reports.
 - `health` – Evaluate drawdown and sector health of a portfolio snapshot.
 - `notebook` – Copy the prebuilt analysis notebook to a destination workspace.
+- `refresh-fundamentals` - Download and cache Alpha Vantage fundamentals for seed symbols.
+- `schedule-fundamentals` - Run the fundamentals cache automation loop using configured schedules.
 - `refresh-russell` - Download the latest Russell 2000 constituent list.
 
 Example help:
@@ -96,6 +98,8 @@ Example help:
 python main.py scan --help
 python main.py backtest --help
 ```
+
+`schedule-fundamentals` reads the `automation.fundamentals_refresh` settings (frequency, day/time, Russell merge toggle, validation thresholds) and loops until interrupted. Add `--run-once` to execute a single cycle when external schedulers (cron, Task Scheduler) invoke the command.
 
 ---
 
@@ -265,6 +269,21 @@ Logging with `--verbose` surfaces module-level context helpful for debugging.
 
 ---
 
+
+
+### Automation Tips
+- Use `python main.py schedule-fundamentals` to run the fundamentals cache loop defined in `automation.fundamentals_refresh`. Add `--force` if you need to override a disabled config toggle.
+- For single-shot runs (CI, Task Scheduler, cron wrappers) append `--run-once` so the command exits after one refresh/validation cycle.
+- Cron example (Linux/OS X):
+  ```bash
+  30 22 * * * /usr/bin/env bash -lc 'cd /path/to/trading_system && source .venv/bin/activate && python main.py schedule-fundamentals --force'
+  ```
+- Windows Task Scheduler example:
+  ```powershell
+  schtasks /Create /SC WEEKLY /D SUN /ST 22:30 /TN "TradingSystemFundamentals" /TR "cmd /c cd C:\projects\trading_system && .venv\Scripts\python.exe main.py schedule-fundamentals --force"
+  ```
+- Pair the scheduler with `python main.py refresh-russell --run-once` before each cycle if you want to pull fresh Russell constituents.
+## Next Steps
 ## Next Steps
 1. **Calibrate Parameters** – Tailor `strategy_weights` and risk controls to your mandate before running live capital.
 2. **Integrate with Scheduling** – Use cron or Windows Task Scheduler to run `scan` and `health` commands weekly, leveraging the email alerts.

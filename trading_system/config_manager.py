@@ -4,9 +4,13 @@ from __future__ import annotations
 
 import json
 import os
+from datetime import datetime
 from dataclasses import dataclass, field, asdict
 from pathlib import Path
 from typing import Any, Dict, Optional
+
+
+WEEKDAY_NAMES = {"monday", "tuesday", "wednesday", "thursday", "friday", "saturday", "sunday"}
 
 
 class ConfigError(Exception):
@@ -75,12 +79,40 @@ class StorageConfig:
 
 
 @dataclass
+class FundamentalsValidationConfig:
+    enabled: bool = True
+    min_universe_size: int = 10
+    sample_size: Optional[int] = None
+    persist_snapshot: bool = True
+    fail_on_breach: bool = True
+
+
+@dataclass
+class FundamentalsRefreshAutomationConfig:
+    enabled: bool
+    frequency: str
+    time: str
+    day: Optional[str] = None
+    include_russell: bool = False
+    limit: Optional[int] = None
+    throttle: float = 12.0
+    validation: FundamentalsValidationConfig = field(default_factory=FundamentalsValidationConfig)
+
+
+@dataclass
 class AutomationConfig:
     scan_frequency: str
     scan_day: str
     scan_time: str
     timezone: str
     send_reports: bool = True
+    fundamentals_refresh: FundamentalsRefreshAutomationConfig = field(
+        default_factory=lambda: FundamentalsRefreshAutomationConfig(
+            enabled=False,
+            frequency="daily",
+            time="00:00",
+        )
+    )
 
 
 @dataclass
@@ -180,7 +212,43 @@ class ConfigManager:
                 key: Path(value)
                 for key, value in data["storage"].items()
             })
-            automation = AutomationConfig(**data["automation"])
+            automation_data = data["automation"]
+            fundamentals_data = automation_data.get("fundamentals_refresh", {})
+            validation_data = fundamentals_data.get("validation", {})
+
+            sample_size_value = validation_data.get("sample_size")
+            sample_size = int(sample_size_value) if sample_size_value is not None else None
+
+            validation = FundamentalsValidationConfig(
+                enabled=validation_data.get("enabled", True),
+                min_universe_size=int(validation_data.get("min_universe_size", 10)),
+                sample_size=sample_size,
+                persist_snapshot=validation_data.get("persist_snapshot", True),
+                fail_on_breach=validation_data.get("fail_on_breach", True),
+            )
+
+            limit_value = fundamentals_data.get("limit")
+            limit = int(limit_value) if limit_value is not None else None
+
+            fundamentals_refresh = FundamentalsRefreshAutomationConfig(
+                enabled=fundamentals_data.get("enabled", False),
+                frequency=str(fundamentals_data.get("frequency", "daily")),
+                time=str(fundamentals_data.get("time", "22:00")),
+                day=fundamentals_data.get("day"),
+                include_russell=fundamentals_data.get("include_russell", False),
+                limit=limit,
+                throttle=float(fundamentals_data.get("throttle", 12.0)),
+                validation=validation,
+            )
+
+            automation = AutomationConfig(
+                scan_frequency=automation_data["scan_frequency"],
+                scan_day=automation_data["scan_day"],
+                scan_time=automation_data["scan_time"],
+                timezone=automation_data["timezone"],
+                send_reports=automation_data.get("send_reports", True),
+                fundamentals_refresh=fundamentals_refresh,
+            )
         except KeyError as exc:
             raise ConfigError(f"Missing required configuration section: {exc}") from exc
         except TypeError as exc:
@@ -228,6 +296,34 @@ class ConfigManager:
             if not isinstance(path, Path):
                 raise ConfigError("Storage paths must be valid paths")
 
+        refresh = config.automation.fundamentals_refresh
+        frequency = refresh.frequency.lower()
+        if frequency not in {"daily", "weekly"}:
+            raise ConfigError("automation.fundamentals_refresh.frequency must be 'daily' or 'weekly'")
+
+        if not self._is_valid_time_format(refresh.time):
+            raise ConfigError("automation.fundamentals_refresh.time must be HH:MM or HH:MM:SS")
+
+        if refresh.limit is not None and refresh.limit <= 0:
+            raise ConfigError("automation.fundamentals_refresh.limit must be positive when set")
+
+        if refresh.throttle < 0:
+            raise ConfigError("automation.fundamentals_refresh.throttle must be non-negative")
+
+        validation = refresh.validation
+        if validation.sample_size is not None and validation.sample_size <= 0:
+            raise ConfigError("automation.fundamentals_refresh.validation.sample_size must be positive when set")
+
+        if validation.min_universe_size < 0:
+            raise ConfigError("automation.fundamentals_refresh.validation.min_universe_size must be >= 0")
+
+        if frequency == "weekly":
+            day = (refresh.day or config.automation.scan_day or "").strip().lower()
+            if not day:
+                raise ConfigError("automation.fundamentals_refresh.day or automation.scan_day must be provided for weekly schedules")
+            if day not in WEEKDAY_NAMES:
+                raise ConfigError("automation.fundamentals_refresh.day must be a valid weekday name")
+
     def _ensure_storage_paths(self, config: TradingSystemConfig) -> None:
         for path in config.storage.__dict__.values():
             path.mkdir(parents=True, exist_ok=True)
@@ -252,6 +348,16 @@ class ConfigManager:
             return json.loads(value)
         except json.JSONDecodeError:
             return value
+
+    @staticmethod
+    def _is_valid_time_format(value: str) -> bool:
+        for fmt in ("%H:%M", "%H:%M:%S"):
+            try:
+                datetime.strptime(value, fmt)
+                return True
+            except ValueError:
+                continue
+        return False
 
     @staticmethod
     def _set_nested_value(target: Dict[str, Any], path_parts: list[str], value: Any) -> None:
@@ -307,5 +413,7 @@ __all__ = [
     "DataSourcesConfig",
     "UniverseCriteriaConfig",
     "StorageConfig",
+    "FundamentalsValidationConfig",
+    "FundamentalsRefreshAutomationConfig",
     "AutomationConfig",
 ]

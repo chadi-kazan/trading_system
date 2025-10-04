@@ -89,6 +89,7 @@ def test_builder_filters_symbols(config_with_tmp_storage):
 
     result = builder.build_universe(["GOOD", "SMALL"], persist=False)
 
+    assert builder.last_snapshot_path() is None
     assert list(result["symbol"]) == ["GOOD"]
     row = result.iloc[0]
     assert pytest.approx(row["market_cap"], rel=1e-6) == 1_200_000_000
@@ -124,6 +125,7 @@ def test_builder_uses_cache_round_trip(config_with_tmp_storage):
     builder._write_cache(snapshot)  # type: ignore[attr-defined]
     result = builder.build_universe(["CACHE"], persist=False)
 
+    assert builder.last_snapshot_path() is None
     assert list(result["symbol"]) == ["CACHE"]
 
 
@@ -171,5 +173,47 @@ def test_builder_records_skipped_symbols(config_with_tmp_storage):
 
     result = builder.build_universe(["GOOD", "MISS"], persist=False)
 
+    assert builder.last_snapshot_path() is None
     assert list(result["symbol"]) == ["GOOD"]
     assert builder.last_skipped_symbols() == ["MISS"]
+
+def test_builder_tracks_snapshot_path(config_with_tmp_storage):
+    config = config_with_tmp_storage
+
+    data_map = {
+        "GOOD": {
+            "fast": {
+                "market_cap": 1_200_000_000,
+                "last_price": 12.0,
+                "ten_day_average_volume": 150_000,
+                "shares_float": 20_000_000,
+                "bid": 11.9,
+                "ask": 12.1,
+            },
+            "info": {
+                "sector": "Technology",
+                "exchange": "NASDAQ",
+                "shortName": "Good Tech",
+            },
+        }
+    }
+
+    def factory(symbol: str) -> DummyTicker:
+        if symbol not in data_map:
+            raise KeyError(symbol)
+        return DummyTicker(symbol, data_map)
+
+    builder = UniverseBuilder(
+        config,
+        cache_dir=config.storage.universe_dir / "cache",
+        cache_ttl_days=0,
+        ticker_factory=factory,
+    )
+
+    result = builder.build_universe(["GOOD"], persist=True)
+
+    snapshot_path = builder.last_snapshot_path()
+    assert snapshot_path is not None
+    assert snapshot_path.exists()
+    assert "GOOD" in snapshot_path.read_text()
+    assert list(result["symbol"]) == ["GOOD"]
