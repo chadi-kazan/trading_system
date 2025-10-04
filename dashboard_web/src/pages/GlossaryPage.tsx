@@ -47,16 +47,18 @@ export function GlossaryPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold text-slate-900">Glossary & Abbreviations</h1>
         <p className="text-base text-slate-600">
-          Quick definitions for the terminology used across the dashboard. Follow the links for deeper dives if you are new
-          to technical analysis or fundamentals.
+          Expand any term below to reveal a plain-language explanation and jump to an external primer if you’re learning the
+          concepts for the first time.
         </p>
       </header>
 
-      <dl className="space-y-6">
+      <div className="space-y-4">
         {glossaryEntries.map((entry) => (
-          <div key={entry.term} className="rounded-2xl border border-slate-200 bg-white/95 p-6 shadow-sm shadow-slate-200/60">
-            <dt className="text-lg font-semibold text-slate-900">{entry.term}</dt>
-            <dd className="mt-2 text-sm text-slate-600">{entry.definition}</dd>
+          <details key={entry.term} className="rounded-2xl border border-slate-200 bg-white/95 p-5 shadow-sm shadow-slate-200/60">
+            <summary className="cursor-pointer text-lg font-semibold text-slate-900">
+              {entry.term}
+            </summary>
+            <p className="mt-3 text-sm text-slate-600">{entry.definition}</p>
             <a
               href={entry.link}
               target="_blank"
@@ -64,13 +66,11 @@ export function GlossaryPage() {
               className="mt-3 inline-flex items-center gap-2 text-sm font-medium text-blue-600 transition hover:text-blue-500"
             >
               Learn more on Investopedia
-              <span aria-hidden className="h-4 w-4">
-                ?
-              </span>
+              <span aria-hidden className="h-4 w-4">?</span>
             </a>
-          </div>
+          </details>
         ))}
-      </dl>
+      </div>
     </div>
   );
 }

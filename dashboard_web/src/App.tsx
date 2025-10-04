@@ -1,11 +1,12 @@
 import { useEffect, useMemo, useState } from "react";
 import { NavLink, Route, Routes } from "react-router-dom";
 import { fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
-import type { StrategyInfo, SymbolAnalysis, SymbolSearchResult } from "./types";
+import type { AggregatedSignal, StrategyInfo, SymbolAnalysis, SymbolSearchResult } from "./types";
 import { SearchPanel } from "./components/SearchPanel";
 import { PriceChart } from "./components/PriceChart";
 import { StrategyCard } from "./components/StrategyCard";
 import { AggregatedSignals } from "./components/AggregatedSignals";
+import { ScenarioCallouts } from "./components/ScenarioCallouts";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
 
@@ -16,8 +17,34 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-function DashboardPage() {
-  const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
+function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined) {
+  const annotations: {
+    breakout?: number | null;
+    handleHigh?: number | null;
+    atrStop?: number | null;
+  } = {};
+
+  if (!strategies) return annotations;
+
+  const danZanger = strategies.find((strategy) => strategy.name === "dan_zanger_cup_handle");
+  if (danZanger?.latest_metadata) {
+    annotations.breakout = typeof danZanger.latest_metadata.breakout_price === "number" ? danZanger.latest_metadata.breakout_price : null;
+    annotations.handleHigh = typeof danZanger.latest_metadata.right_peak === "number" ? danZanger.latest_metadata.right_peak : null;
+  }
+
+  const trend = strategies.find((strategy) => strategy.name === "trend_following");
+  if (trend?.extras?.latest_stop_price) {
+    annotations.atrStop = typeof trend.extras.latest_stop_price === "number" ? trend.extras.latest_stop_price : null;
+  }
+
+  return annotations;
+}
+
+function DashboardPage({
+  strategiesMeta,
+}: {
+  strategiesMeta: StrategyInfo[];
+}) {
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolSearchResult | null>(null);
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null);
@@ -26,11 +53,9 @@ function DashboardPage() {
   const [error, setError] = useState<string | null>(null);
   const [lastQuery, setLastQuery] = useState("");
 
-  useEffect(() => {
-    fetchStrategies().then(setStrategies).catch((err) => {
-      console.error(err);
-    });
-  }, []);
+  const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
+
+  const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
 
   const performSearch = async (query: string) => {
     setLoadingSearch(true);
@@ -72,6 +97,7 @@ function DashboardPage() {
   };
 
   const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
+  const latestAggregated = aggregatedSignals.at(-1) ?? null;
 
   return (
     <div className="mx-auto w-full max-w-7xl gap-8 px-6 py-10 lg:grid lg:grid-cols-[360px,1fr]">
@@ -92,7 +118,7 @@ function DashboardPage() {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Signal Dashboard</h2>
               <p className="text-sm text-slate-500">
-                Strategies loaded: {strategies.length} · Data source: Yahoo Finance + Alpha Vantage fundamentals
+                Strategies loaded: {strategiesMeta.length} · Data source: Yahoo Finance + Alpha Vantage fundamentals
               </p>
             </div>
             {selectedSymbol && (
@@ -111,9 +137,11 @@ function DashboardPage() {
             )}
           </div>
           <p className="mt-3 text-xs uppercase tracking-wide text-slate-400">
-            Interval: 1d • Lookback: 3 years • Aggregated confidence highlights cross-strategy alignment
+            Interval: 1d • Lookback: 3 years • Hover charts or badges for interpretation cues
           </p>
         </div>
+
+        <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
 
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
@@ -123,8 +151,8 @@ function DashboardPage() {
 
         {analysis && (
           <>
-            <PriceChart data={analysis.price_bars} />
-            <AggregatedSignals signals={analysis.aggregated_signals} />
+            <PriceChart data={analysis.price_bars} annotations={annotations} latestAggregated={latestAggregated} />
+            <AggregatedSignals signals={aggregatedSignals} />
             <div className="grid gap-6 md:grid-cols-2">
               {strategyCards.map((strategy) => (
                 <StrategyCard key={strategy.name} strategy={strategy} />
@@ -154,8 +182,7 @@ function NotFoundPage() {
     <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
       <h1 className="text-3xl font-semibold text-slate-900">Page not found</h1>
       <p className="text-sm text-slate-500">
-        The page you were looking for doesn’t exist. Use the navigation above to return to the dashboard or browse the
-        guides.
+        The page you were looking for doesn’t exist. Use the navigation above to return to the dashboard or browse the guides.
       </p>
       <NavLink
         to="/"
@@ -174,6 +201,12 @@ const navLinks = [
 ];
 
 export default function App() {
+  const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
+
+  useEffect(() => {
+    fetchStrategies().then(setStrategies).catch((err) => console.error(err));
+  }, []);
+
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-slate-900 px-6 pb-5 pt-8 text-white shadow-lg shadow-slate-900/40">
@@ -194,9 +227,7 @@ export default function App() {
                 end={link.to === "/"}
                 className={({ isActive }) =>
                   `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                    isActive
-                      ? "bg-white text-slate-900 shadow"
-                      : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
+                    isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
                   }`
                 }
               >
@@ -208,7 +239,7 @@ export default function App() {
       </header>
 
       <Routes>
-        <Route path="/" element={<DashboardPage />} />
+        <Route path="/" element={<DashboardPage strategiesMeta={strategies} />} />
         <Route path="/guides/signals" element={<SignalGuide />} />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="*" element={<NotFoundPage />} />

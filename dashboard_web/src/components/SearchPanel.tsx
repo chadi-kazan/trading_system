@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { FormEvent, useState } from "react";
 import type { SymbolSearchResult } from "../types";
 
 interface SearchPanelProps {
@@ -20,7 +20,7 @@ export function SearchPanel({
 }: SearchPanelProps) {
   const [input, setInput] = useState(lastQuery);
 
-  const handleSubmit = async (event: React.FormEvent<HTMLFormElement>) => {
+  const handleSubmit = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
     const trimmed = input.trim();
     if (!trimmed) return;
@@ -109,3 +109,4 @@ export function SearchPanel({
     </section>
   );
 }
+

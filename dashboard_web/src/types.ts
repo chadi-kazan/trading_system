@@ -65,3 +65,4 @@ export type SymbolSearchResult = {
   currency?: string;
   match_score: number;
 };
+
