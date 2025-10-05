@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
 import { fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
 import type { AggregatedSignal, StrategyInfo, SymbolAnalysis, SymbolSearchResult } from "./types";
 import { SearchPanel } from "./components/SearchPanel";
@@ -40,11 +40,7 @@ function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined
   return annotations;
 }
 
-function DashboardPage({
-  strategiesMeta,
-}: {
-  strategiesMeta: StrategyInfo[];
-}) {
+function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolSearchResult | null>(null);
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null);
@@ -54,8 +50,9 @@ function DashboardPage({
   const [lastQuery, setLastQuery] = useState("");
 
   const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
-
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
+  const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
+  const latestAggregated = aggregatedSignals.at(-1) ?? null;
 
   const performSearch = async (query: string) => {
     setLoadingSearch(true);
@@ -96,9 +93,6 @@ function DashboardPage({
     loadSymbolAnalysis(result.symbol).catch(() => undefined);
   };
 
-  const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
-  const latestAggregated = aggregatedSignals.at(-1) ?? null;
-
   return (
     <div className="mx-auto w-full max-w-7xl gap-8 px-6 py-10 lg:grid lg:grid-cols-[360px,1fr]">
       <aside className="lg:sticky lg:top-8 lg:self-start">
@@ -118,7 +112,7 @@ function DashboardPage({
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Signal Dashboard</h2>
               <p className="text-sm text-slate-500">
-                Strategies loaded: {strategiesMeta.length} · Data source: Yahoo Finance + Alpha Vantage fundamentals
+                Strategies loaded: {strategiesMeta.length}  -  Data source: Yahoo Finance + Alpha Vantage fundamentals
               </p>
             </div>
             {selectedSymbol && (
@@ -131,13 +125,13 @@ function DashboardPage({
                   onClick={() => loadSymbolAnalysis(selectedSymbol.symbol)}
                   disabled={loadingAnalysis}
                 >
-                  {loadingAnalysis ? "Refreshing…" : "Manual Refresh"}
+                  {loadingAnalysis ? "Refreshing..." : "Manual Refresh"}
                 </button>
               </div>
             )}
           </div>
           <p className="mt-3 text-xs uppercase tracking-wide text-slate-400">
-            Interval: 1d • Lookback: 3 years • Hover charts or badges for interpretation cues
+            Interval: 1d  -  Lookback: 3 years  -  Hover charts or badges for interpretation cues
           </p>
         </div>
 
@@ -169,7 +163,7 @@ function DashboardPage({
 
         {loadingAnalysis && (
           <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-5 text-sm text-blue-700 shadow-sm shadow-blue-200/40">
-            Fetching the latest prices and strategy signals…
+            Fetching the latest prices and strategy signals...
           </div>
         )}
       </section>
@@ -182,7 +176,7 @@ function NotFoundPage() {
     <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
       <h1 className="text-3xl font-semibold text-slate-900">Page not found</h1>
       <p className="text-sm text-slate-500">
-        The page you were looking for doesn’t exist. Use the navigation above to return to the dashboard or browse the guides.
+        The page you were looking for does not exist. Use the navigation above to return to the dashboard or browse the guides.
       </p>
       <NavLink
         to="/"
@@ -200,13 +194,7 @@ const navLinks = [
   { label: "Glossary", to: "/guides/glossary" },
 ];
 
-export default function App() {
-  const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
-
-  useEffect(() => {
-    fetchStrategies().then(setStrategies).catch((err) => console.error(err));
-  }, []);
-
+function AppLayout({ strategies }: { strategies: StrategyInfo[] }) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-slate-900 px-6 pb-5 pt-8 text-white shadow-lg shadow-slate-900/40">
@@ -245,5 +233,19 @@ export default function App() {
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
+  );
+}
+
+export default function App() {
+  const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
+
+  useEffect(() => {
+    fetchStrategies().then(setStrategies).catch((err) => console.error(err));
+  }, []);
+
+  return (
+    <BrowserRouter>
+      <AppLayout strategies={strategies} />
+    </BrowserRouter>
   );
 }

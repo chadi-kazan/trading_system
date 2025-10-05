@@ -32,7 +32,7 @@ export function ScenarioCallouts({ aggregatedSignals, strategies }: ScenarioCall
     if (handlePullback && (handlePullback < 0.05 || handlePullback > 0.15)) {
       callouts.push({
         title: "Handle depth outside ideal band",
-        body: "Cup-handle pullback usually performs best between 5–15%. Watch price stability before committing capital.",
+        body: "Cup-handle pullback usually performs best between 5-15%. Watch price stability before committing capital.",
         tone: "warning",
       });
     }

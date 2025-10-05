@@ -26,7 +26,7 @@ const glossaryEntries = [
   },
   {
     term: "Relative Strength",
-    definition: "A measure comparing a stock’s performance vs. a benchmark or peer group.",
+    definition: "A measure comparing a stock's performance vs. a benchmark or peer group.",
     link: "https://www.investopedia.com/terms/r/relativestrength.asp",
   },
   {
@@ -47,7 +47,7 @@ export function GlossaryPage() {
       <header className="space-y-2">
         <h1 className="text-3xl font-semibold text-slate-900">Glossary & Abbreviations</h1>
         <p className="text-base text-slate-600">
-          Expand any term below to reveal a plain-language explanation and jump to an external primer if you’re learning the
+          Expand any term below to reveal a plain-language explanation and jump to an external primer if you're learning the
           concepts for the first time.
         </p>
       </header>

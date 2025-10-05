@@ -66,7 +66,8 @@
 - [x] ~~Implement combined strategy backtesting aggregation (Deliverable: `backtesting/combiner.py` + tests).~~
 - [x] ~~Generate performance attribution reports (Deliverable: reporting module + sample output in `reports/`; Notes: `reports/performance.py`, `reports/attribution.py`, and `reports/combined.py`).~~
 - [x] ~~Provide Jupyter notebook templates for analysis (Deliverable: notebooks demonstrating workflows; Notes: `notebooks/backtest_analysis_template.ipynb`).~~
-## Recent Updates (2025-09-24)\n- [x] Added dashboard education pages (signal guide + glossary with external resources) (Completed: 2025-10-04).
+## Recent Updates (2025-09-24)
+- [x] Enhanced dashboard visuals with inline overlays, tooltips, and scenario callouts (Completed: 2025-10-04).\n- [x] Added dashboard education pages (signal guide + glossary with external resources) (Completed: 2025-10-04).
 - [x] Added dashboard API caching/throttling guards and surfaced rate-limit responses (Completed: 2025-10-04).
 - [x] Expanded scheduler CLI validation tests (limits, throttle, conflict handling) (Completed: 2025-10-04).
 - [x] Implemented FastAPI dashboard API endpoints for symbol analysis and search (Completed: 2025-10-04).
@@ -95,6 +96,8 @@
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+
+
 
 
 

@@ -81,7 +81,7 @@ export function PriceChart({ data, annotations, latestAggregated }: PriceChartPr
         </div>
         {latestAggregated && (
           <div className="rounded-full bg-blue-50 px-4 py-1 text-xs font-medium text-blue-700">
-            Latest aggregated: {latestAggregated.signal_type} · Confidence {latestAggregated.confidence.toFixed(2)}
+            Latest aggregated: {latestAggregated.signal_type}  -  Confidence {latestAggregated.confidence.toFixed(2)}
           </div>
         )}
       </div>

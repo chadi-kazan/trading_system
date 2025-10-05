@@ -54,7 +54,7 @@ export function SearchPanel({
               className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
               disabled={loading}
             >
-              {loading ? "Searching…" : "Search"}
+              {loading ? "Searching..." : "Search"}
             </button>
             {lastQuery && !loading && (
               <span className="text-xs uppercase tracking-wide text-slate-400">Last query: {lastQuery}</span>
@@ -98,8 +98,8 @@ export function SearchPanel({
                   )}
                 </div>
                 <div className="mt-1 text-xs text-slate-500">
-                  {item.name || "Unnamed"} · {item.region}
-                  {item.currency ? ` · ${item.currency}` : ""}
+                  {item.name || "Unnamed"}  -  {item.region}
+                  {item.currency ? `  -  ${item.currency}` : ""}
                 </div>
               </button>
             );
@@ -109,4 +109,5 @@ export function SearchPanel({
     </section>
   );
 }
+
 

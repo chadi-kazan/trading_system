@@ -14,16 +14,16 @@ const signalBlocks = [
   {
     title: "Dan Zanger Cup & Handle",
     summary:
-      "Looks for rounded 'cup' bases followed by a tight handle before a high-volume breakout above resistance.",
+      "Looks for rounded cup bases followed by a tight handle before a high-volume breakout above resistance.",
     whatToWatch: [
       "Cup depth between 12% and 35% with a strong recovery toward prior highs",
-      "Handle drift should stay relatively shallow (5–15%) and tight in price range",
-      "Breakout must occur on decisive volume—ideally 1.5× the 20-day average",
+      "Handle drift stays relatively shallow (5-15%) and tight in price range",
+      "Breakout must occur on decisive volume, ideally 1.5x the 20-day average",
     ],
     whatToAvoid: [
       "Handles that undercut the midpoint of the cup",
       "Breakouts without a volume surge or with wide, volatile candles",
-      "Cup structures that form too quickly (less than 8 weeks) or too slowly (longer than 6 months)",
+      "Cup structures that form too quickly (under 8 weeks) or drag on longer than 6 months",
     ],
     linkLabel: "Cup-and-handle primer",
     link: resources.danZanger,
@@ -33,13 +33,13 @@ const signalBlocks = [
     summary:
       "Composite score derived from earnings growth, relative strength, proximity to 52-week highs, and volume expansion.",
     whatToWatch: [
-      "Earnings growth = 25% and consistently positive year over year",
+      "Earnings growth at or above 25% with consistent results year over year",
       "Relative strength above 0.8 indicates top-quintile outperformance",
       "Price close to its 52-week high while volume expands versus average",
     ],
     whatToAvoid: [
       "Rising score driven by a single factor while others deteriorate",
-      "Volume spikes accompanied by falling price (distribution)",
+      "Volume spikes accompanied by falling price (distribution days)",
       "Companies with erratic earnings growth or recurring one-off gains",
     ],
     linkLabel: "CAN SLIM overview",
@@ -52,12 +52,12 @@ const signalBlocks = [
     whatToWatch: [
       "Fast EMA crossing above slow EMA with price respecting the fast EMA as support",
       "ATR-based stop distance shrinking as volatility contracts",
-      "Multiple time-frame alignment (e.g., weekly trend also up)",
+      "Multiple time frame alignment (for example, weekly trend also pointing higher)",
     ],
     whatToAvoid: [
       "Whipsaw environments with frequent crossovers",
-      "Taking signals without confirming price closing above the fast EMA",
-      "Ignoring ATR tick-up (i.e., stop levels widening rapidly)",
+      "Taking signals without price closing above the fast EMA",
+      "Ignoring rising ATR readings, which widen stops and signal volatility spikes",
     ],
     linkLabel: "Trend trading basics",
     link: resources.trendFollowing,
@@ -65,11 +65,11 @@ const signalBlocks = [
   {
     title: "Livermore Breakout",
     summary:
-      "Identifies tight consolidations (Livermore's ""pivotal points"") followed by volume-backed breakouts.",
+      "Identifies tight consolidations (Livermore's \"pivotal points\") followed by volume-backed breakouts.",
     whatToWatch: [
-      "Range contraction over 3–5 weeks (= 15% high-to-low)",
-      "Breakout candle closing near the high with 1.3× average volume",
-      "Sector leadership or strong market context when breakout occurs",
+      "Range contraction over 3-5 weeks (no more than ~15% high-to-low)",
+      "Breakout candle closing near the high with 1.3x average volume",
+      "Sector leadership or healthy market breadth when the breakout triggers",
     ],
     whatToAvoid: [
       "Breakouts triggered during weak overall market breadth",
@@ -82,16 +82,16 @@ const signalBlocks = [
   {
     title: "Aggregated Signal",
     summary:
-      "Weighted blend of all strategies. Reinforces when multiple playbooks align, filters out isolated signals.",
+      "Weighted blend of all strategies. Reinforces when multiple playbooks align and filters out isolated signals.",
     whatToWatch: [
-      "Clustered BUY signals across at least two strategies",
-      "Confidence > 0.6 combined with rising relative strength",
-      "Backtest stats (win rate, expectancy) for the specific symbol/universe",
+      "Clustered BUY signals across at least two playbooks",
+      "Confidence above 0.6 combined with rising relative strength",
+      "Review backtest stats (win rate, expectancy) for the specific symbol or universe",
     ],
     whatToAvoid: [
       "Aggregation driven by a single high-confidence outlier",
-      "Conflicting signals (BUY + SELL) firing within a short window",
-      "Chasing signals far above the breakout or after large gaps",
+      "Conflicting signals (BUY and SELL) firing within a short window",
+      "Chasing signals far above the breakout or after extended gaps",
     ],
     linkLabel: "Position sizing & risk management",
     link: resources.positionSizing,
