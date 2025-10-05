@@ -1,15 +1,18 @@
 import { useEffect, useMemo, useState } from "react";
-import { BrowserRouter, NavLink, Route, Routes } from "react-router-dom";
+import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
 import { fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
-import type { AggregatedSignal, StrategyInfo, SymbolAnalysis, SymbolSearchResult } from "./types";
+import type { AggregatedSignal, StrategyInfo, StrategyScore, SymbolAnalysis, SymbolSearchResult } from "./types";
 import { SearchPanel } from "./components/SearchPanel";
 import { PriceChart } from "./components/PriceChart";
 import { StrategyCard } from "./components/StrategyCard";
 import { AggregatedSignals } from "./components/AggregatedSignals";
 import { ScenarioCallouts } from "./components/ScenarioCallouts";
-import { FinalScoreChart, StrategyScore } from "./components/FinalScoreChart";
+import { FinalScoreChart } from "./components/FinalScoreChart";
+import { WatchlistPage } from "./pages/WatchlistPage";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
+import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
+import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 
 const THREE_YEARS_AGO = new Date();
 THREE_YEARS_AGO.setDate(THREE_YEARS_AGO.getDate() - 365 * 3);
@@ -41,7 +44,26 @@ function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined
   return annotations;
 }
 
-function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
+type SavePayload = {
+  symbol: string;
+  status: WatchlistStatus;
+  finalScores: StrategyScore[];
+  averageScore: number;
+  aggregatedSignal?: AggregatedSignal | null;
+};
+
+function DashboardPage({
+  strategiesMeta,
+  onSave,
+  watchlistItems,
+}: {
+  strategiesMeta: StrategyInfo[];
+  onSave: (payload: SavePayload) => Promise<void> | void;
+  watchlistItems: SavedSignal[];
+}) {
+  const location = useLocation();
+  const navigate = useNavigate();
+
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolSearchResult | null>(null);
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null);
@@ -49,6 +71,8 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [lastQuery, setLastQuery] = useState("");
+  const [selectedStatus, setSelectedStatus] = useState<WatchlistStatus>(WATCHLIST_STATUSES[0]);
+  const [pendingAutoSave, setPendingAutoSave] = useState<WatchlistStatus | null>(null);
 
   const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
@@ -57,7 +81,7 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
     if (!strategyCards.length) return [];
     return strategyCards.map((strategy) => {
       const latest = strategy.signals.at(-1);
-      const raw = typeof latest?.confidence === 'number' ? latest.confidence : 0;
+      const raw = typeof latest?.confidence === "number" ? latest.confidence : 0;
       const clamped = Math.max(0, Math.min(raw, 1));
       return {
         name: strategy.name,
@@ -70,6 +94,33 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
     ? finalScores.reduce((sum, entry) => sum + entry.value, 0) / finalScores.length
     : 0;
   const latestAggregated = aggregatedSignals.at(-1) ?? null;
+
+  useEffect(() => {
+    const state = (location.state as { symbol?: string; status?: WatchlistStatus } | undefined) || {};
+    if (state.symbol) {
+      const symbol = state.symbol.toUpperCase();
+      const existing = watchlistItems.find((item) => item.symbol.toUpperCase() === symbol);
+      setSelectedStatus(existing?.status ?? WATCHLIST_STATUSES[0]);
+      setPendingAutoSave(existing?.status ?? WATCHLIST_STATUSES[0]);
+      setSelectedSymbol({
+        symbol,
+        name: existing?.symbol ?? symbol,
+        type: existing ? "" : "",
+        region: "",
+        currency: "",
+        match_score: 0,
+      });
+      loadSymbolAnalysis(symbol).catch(() => undefined);
+      navigate(location.pathname, { replace: true });
+    }
+  }, [location.state, watchlistItems, navigate]);
+
+  useEffect(() => {
+    if (analysis && selectedSymbol && pendingAutoSave) {
+      handleSave(pendingAutoSave);
+      setPendingAutoSave(null);
+    }
+  }, [analysis, selectedSymbol, pendingAutoSave]);
 
   const performSearch = async (query: string) => {
     setLoadingSearch(true);
@@ -107,7 +158,20 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
 
   const handleSelectSymbol = (result: SymbolSearchResult) => {
     setSelectedSymbol(result);
+    const existing = watchlistItems.find((item) => item.symbol.toUpperCase() === result.symbol.toUpperCase());
+    setSelectedStatus(existing?.status ?? WATCHLIST_STATUSES[0]);
     loadSymbolAnalysis(result.symbol).catch(() => undefined);
+  };
+
+  const handleSave = (statusOverride?: WatchlistStatus) => {
+    if (!selectedSymbol || !analysis || finalScores.length === 0) return;
+    void onSave({
+      symbol: selectedSymbol.symbol,
+      status: statusOverride ?? selectedStatus,
+      finalScores,
+      averageScore,
+      aggregatedSignal: aggregatedSignals.at(-1) ?? null,
+    });
   };
 
   return (
@@ -129,7 +193,7 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
             <div>
               <h2 className="text-lg font-semibold text-slate-900">Signal Dashboard</h2>
               <p className="text-sm text-slate-500">
-                Strategies loaded: {strategiesMeta.length}  -  Data source: Yahoo Finance + Alpha Vantage fundamentals
+                Strategies loaded: {strategiesMeta.length} - Data source: Yahoo Finance + Alpha Vantage fundamentals
               </p>
             </div>
             {selectedSymbol && (
@@ -148,12 +212,41 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
             )}
           </div>
           <p className="mt-3 text-xs uppercase tracking-wide text-slate-400">
-            Interval: 1d  -  Lookback: 3 years  -  Hover charts or badges for interpretation cues
+            Interval: 1d - Lookback: 3 years - Hover charts or badges for interpretation cues
           </p>
         </div>
 
         <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
-        <FinalScoreChart scores={finalScores} average={averageScore} />
+        <div className="grid gap-4 lg:grid-cols-[1fr,260px]">
+          <FinalScoreChart scores={finalScores} average={averageScore} />
+          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
+            <h3 className="text-sm font-semibold text-slate-900">Save to watchlist</h3>
+            <p className="mt-2 text-xs text-slate-500">
+              Tag the symbol with a status and capture the latest score snapshot for future review.
+            </p>
+            <div className="mt-4 space-y-3">
+              <select
+                value={selectedStatus}
+                onChange={(event) => setSelectedStatus(event.target.value as WatchlistStatus)}
+                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-inner shadow-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+              >
+                {WATCHLIST_STATUSES.map((status) => (
+                  <option key={status} value={status}>
+                    {status}
+                  </option>
+                ))}
+              </select>
+              <button
+                type="button"
+                disabled={!selectedSymbol || !analysis || finalScores.length === 0}
+                onClick={() => handleSave()}
+                className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+              >
+                Save symbol snapshot
+              </button>
+            </div>
+          </div>
+        </div>
 
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
@@ -210,9 +303,20 @@ const navLinks = [
   { label: "Dashboard", to: "/" },
   { label: "Signal Guide", to: "/guides/signals" },
   { label: "Glossary", to: "/guides/glossary" },
+  { label: "Watchlist", to: "/watchlist" },
 ];
 
-function AppLayout({ strategies }: { strategies: StrategyInfo[] }) {
+function AppLayout({
+  strategies,
+  watchlistItems,
+  handleSaveWatchlist,
+  removeFromWatchlist,
+}: {
+  strategies: StrategyInfo[];
+  watchlistItems: SavedSignal[];
+  handleSaveWatchlist: (payload: SavePayload) => void;
+  removeFromWatchlist: (id: string) => Promise<void>;
+}) {
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="bg-slate-900 px-6 pb-5 pt-8 text-white shadow-lg shadow-slate-900/40">
@@ -245,9 +349,13 @@ function AppLayout({ strategies }: { strategies: StrategyInfo[] }) {
       </header>
 
       <Routes>
-        <Route path="/" element={<DashboardPage strategiesMeta={strategies} />} />
+        <Route
+          path="/"
+          element={<DashboardPage strategiesMeta={strategies} onSave={handleSaveWatchlist} watchlistItems={watchlistItems} />}
+        />
         <Route path="/guides/signals" element={<SignalGuide />} />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
+        <Route path="/watchlist" element={<WatchlistPage items={watchlistItems} remove={removeFromWatchlist} />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
@@ -256,14 +364,34 @@ function AppLayout({ strategies }: { strategies: StrategyInfo[] }) {
 
 export default function App() {
   const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
+  const { items: watchlistItems, save: persistWatchlist, remove } = useWatchlist();
 
   useEffect(() => {
     fetchStrategies().then(setStrategies).catch((err) => console.error(err));
   }, []);
 
+  const handleSaveWatchlist = ({ symbol, status, finalScores, averageScore, aggregatedSignal }: SavePayload) => {
+    void persistWatchlist({
+      symbol: symbol.toUpperCase(),
+      status,
+      final_scores: finalScores,
+      average_score: averageScore,
+      aggregated_signal: aggregatedSignal ?? null,
+    });
+  };
+
   return (
     <BrowserRouter>
-      <AppLayout strategies={strategies} />
+      <AppLayout
+        strategies={strategies}
+        watchlistItems={watchlistItems}
+        handleSaveWatchlist={handleSaveWatchlist}
+        removeFromWatchlist={remove}
+      />
     </BrowserRouter>
   );
 }
+
+
+
+

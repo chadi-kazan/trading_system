@@ -20,9 +20,14 @@ export function ScenarioCallouts({ aggregatedSignals, strategies }: ScenarioCall
 
   if (latestAggregated) {
     const tone = latestAggregated.confidence >= 0.7 ? "positive" : latestAggregated.confidence >= 0.5 ? "neutral" : "warning";
+    const consensusMetadata = latestAggregated.metadata as { strategies?: unknown };
+    const strategyNames =
+      Array.isArray(consensusMetadata.strategies) && consensusMetadata.strategies.every((entry) => typeof entry === "string")
+        ? (consensusMetadata.strategies as string[]).join(", ")
+        : "composite blend";
     callouts.push({
       title: `Consensus ${latestAggregated.signal_type} signal`,
-      body: `Confidence ${latestAggregated.confidence.toFixed(2)} from strategies: ${(latestAggregated.metadata.strategies || []).join(", ")}.`,
+      body: `Confidence ${latestAggregated.confidence.toFixed(2)} from strategies: ${strategyNames}.`,
       tone,
     });
   }

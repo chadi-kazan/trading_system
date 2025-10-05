@@ -12,3 +12,4 @@ data/universe/fundamentals_cache/
 .venv/
 node_modules/
 dashboard_web/node_modules/
+data/watchlist.db

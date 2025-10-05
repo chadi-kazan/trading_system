@@ -1,10 +1,6 @@
 import { Cell, Pie, PieChart, ResponsiveContainer, Tooltip } from "recharts";
 
-export type StrategyScore = {
-  name: string;
-  label: string;
-  value: number;
-};
+import type { StrategyScore } from "../types";
 
 interface FinalScoreChartProps {
   scores: StrategyScore[];

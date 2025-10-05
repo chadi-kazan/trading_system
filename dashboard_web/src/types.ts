@@ -22,6 +22,12 @@ export type StrategyAnalysis = {
   extras: Record<string, unknown>;
 };
 
+export type StrategyScore = {
+  name: string;
+  label: string;
+  value: number;
+};
+
 export type AggregatedSignal = {
   date: string;
   signal_type: string;
@@ -66,3 +72,19 @@ export type SymbolSearchResult = {
   match_score: number;
 };
 
+export type WatchlistStatus =
+  | "Watch List"
+  | "Has Potential"
+  | "Keep Close Eye"
+  | "In My Portfolio"
+  | "Trim Candidate";
+
+export type WatchlistItem = {
+  id: string;
+  symbol: string;
+  status: WatchlistStatus;
+  saved_at: string;
+  average_score: number;
+  final_scores: StrategyScore[];
+  aggregated_signal?: AggregatedSignal | null;
+};
