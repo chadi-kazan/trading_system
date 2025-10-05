@@ -1,5 +1,21 @@
 # Project Plan: Small-Cap Growth Stock Trading System
 
+## System Reconstruction Blueprint
+1. Establish Python 3.11 environment with FastAPI, Uvicorn, pandas, yfinance, requests, numpy, and pytest per `requirements.txt`. Ensure storage directories align with `config/default_settings.json` (price cache, universe snapshots, signals, portfolio).
+2. Implement FastAPI backend (`dashboard_api/`):
+   - `app.py` creates the app, enables CORS for the React host, and registers the `/api` router.
+   - `routes/meta.py` exposes `/api/health` and `/api/strategies`; `routes/symbols.py` handles `/api/search` and `/api/symbols/{symbol}` with validation and 429 responses.
+   - `services.py` loads config via `ConfigManager`, fetches price history using `YahooPriceProvider`, enriches frames with `enrich_price_frame`, executes all strategies (`strategies/*`), aggregates signals with `SignalAggregator`, applies in-memory caching and Alpha Vantage throttling, and normalises metadata for the API schemas.
+3. Retain CLI entry (`main.py`) with subcommands for scans, backtests, reporting, health checks, dataset refresh, Russell downloads, and scheduled fundamentals refresh orchestrated by `automation.fundamentals_refresh`.
+4. Provide automated tests under `tests/` covering CLI handlers, strategy logic, indicators, enrichment, and data providers. Use temporary directories and config helpers to isolate side effects.
+5. Build React 19 + TypeScript dashboard (`dashboard_web/`) using Vite, Tailwind CSS, Recharts, and `react-router-dom`:
+   - App routes: `/` dashboard, `/guides/signals`, `/guides/glossary`, `*` 404 fallback.
+   - Dashboard renders search panel, scenario callouts, final score donut, price chart overlays, aggregated signals, and strategy cards using API data.
+   - Guides provide interpretation tips and glossary entries with Investopedia links.
+6. Run backend with `python -m uvicorn dashboard_api.app:app --reload` and frontend with `npm run dev` (set `VITE_API_BASE_URL`). Build frontend via `npm run build` for static hosting.
+7. Document setup, API/SPA usage, and deployment guidance in README and `docs/cloud_deployment_plan.md`; update `project_plan.md` after each milestone with tests and next actions.
+
+
 ## Guiding Objectives
 - Deliver a modular Python system that discovers, backtests, and signals small-cap growth stocks using four defined strategies.
 - Prioritize incremental delivery: working data access and filtering before advanced analytics.
@@ -81,6 +97,7 @@
 - [x] Added CLI task to refresh Russell 2000 constituents from an external feed.
 
 ## Phase 6: Web Dashboard Delivery (Planned)
+- [x] Final score doughnut visualisation rolling up strategy confidences. (Completed: 2025-10-04).
 - [x] ~~Scaffold dedicated FastAPI service layer exposing REST endpoints for strategy summaries, signal breakdowns, and price overlays. (Completed: 2025-10-04; Notes: FastAPI app with search + analysis endpoints and service orchestration.)~~
 - [x] ~~Build React SPA (Vite + TypeScript) consuming the API and rendering Recharts-based visualisations for key strategies. (Completed: 2025-10-04; Notes: Vite shell with search, price chart, strategy cards, aggregated signals.)~~
 - [x] ~~Implement shared data contracts, caching/throttling guards for live symbol lookups, and graceful error/loading states. (Completed: 2025-10-04; Notes: in-memory caches, Alpha Vantage throttle guard, 429 surfacing.)~~
@@ -96,6 +113,7 @@
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+
 
 
 

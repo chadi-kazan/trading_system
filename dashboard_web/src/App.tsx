@@ -7,6 +7,7 @@ import { PriceChart } from "./components/PriceChart";
 import { StrategyCard } from "./components/StrategyCard";
 import { AggregatedSignals } from "./components/AggregatedSignals";
 import { ScenarioCallouts } from "./components/ScenarioCallouts";
+import { FinalScoreChart, StrategyScore } from "./components/FinalScoreChart";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
 
@@ -52,6 +53,22 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
   const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
   const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
+  const finalScores: StrategyScore[] = useMemo(() => {
+    if (!strategyCards.length) return [];
+    return strategyCards.map((strategy) => {
+      const latest = strategy.signals.at(-1);
+      const raw = typeof latest?.confidence === 'number' ? latest.confidence : 0;
+      const clamped = Math.max(0, Math.min(raw, 1));
+      return {
+        name: strategy.name,
+        label: strategy.label,
+        value: clamped * 100,
+      };
+    });
+  }, [strategyCards]);
+  const averageScore = finalScores.length
+    ? finalScores.reduce((sum, entry) => sum + entry.value, 0) / finalScores.length
+    : 0;
   const latestAggregated = aggregatedSignals.at(-1) ?? null;
 
   const performSearch = async (query: string) => {
@@ -136,6 +153,7 @@ function DashboardPage({ strategiesMeta }: { strategiesMeta: StrategyInfo[] }) {
         </div>
 
         <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
+        <FinalScoreChart scores={finalScores} average={averageScore} />
 
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
