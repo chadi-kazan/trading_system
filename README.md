@@ -28,7 +28,9 @@ Every capability is orchestrated by `main.py`, which exposes a cohesive CLI whil
 6. [Testing & Quality Assurance](#testing--quality-assurance)
 7. [Troubleshooting & FAQ](#troubleshooting--faq)
 8. [Cloud Deployment](#cloud-deployment)
-9. [Next Steps](#next-steps)
+9. [Watchlist Persistence & Dashboard Integration](#watchlist-persistence--dashboard-integration)
+10. [Strategy Weighting Overview](#strategy-weighting-overview)
+11. [Next Steps](#next-steps)
 ---
 
 ## Prerequisites & Installation
@@ -298,7 +300,43 @@ Logging with `--verbose` surfaces module-level context helpful for debugging.
   schtasks /Create /SC WEEKLY /D SUN /ST 22:30 /TN "TradingSystemFundamentals" /TR "cmd /c cd C:\projects\trading_system && .venv\Scripts\python.exe main.py schedule-fundamentals --force"
   ```
 - Pair the scheduler with `python main.py refresh-russell --run-once` before each cycle if you want to pull fresh Russell constituents.
-## Next Steps
+
+## Watchlist Persistence & Dashboard Integration
+The dashboard keeps every saved signal in a shared SQLite database managed by SQLModel. When you click **Save symbol snapshot** or land on the watchlist page, the workflow is:
+
+1. The React app calls the FastAPI endpoint `/api/watchlist` with the symbol, its current status, score breakdown, and the latest aggregated signal.
+2. FastAPI upserts the record into `data/watchlist.db`, preserving the timestamp so you know how fresh each snapshot is.
+3. Reloading the dashboard or visiting `/watchlist` triggers a `fetchWatchlist` call; the hook converts database records into React state and keeps the list sorted by most recent save.
+4. Opening a watchlist item routes you back to the dashboard, reloads the live chart data, and writes the refreshed snapshot back to the database so stale entries are automatically replaced.
+
+Because persistence lives on the backend you can share the watchlist across browsers or team members; just keep the API running on a reachable host (set `VITE_API_BASE_URL` accordingly). If something looks off, check that the API process has write access to `data/watchlist.db` and watch the FastAPI logs for validation errors.
+
+## Strategy Weighting Overview
+As we move beyond equal-weighted averages, the "final score" will lean on measurable evidence instead of intuition. The goal is to favour strategies that are winning right now, in the current market regime, without letting any single playbook overwhelm the blend.
+
+### Core Ingredients
+- **Rolling reliability metrics:** For each strategy and regime we store win rate, average excess return, volatility, drawdown streaks, and sample size.
+- **Exponential decay:** Recent trades count more than older history so the model reacts quickly when a strategy cools off.
+- **Regime awareness:** Metrics are segmented by market backdrop (trending bull, choppy high-volatility, etc.) so we reuse the right weights at the right time.
+- **Diversification guardrails:** We cap individual weights and penalise highly correlated strategies to avoid double-counting similar signals.
+
+### Example Walkthrough
+Imagine a week where the market is in a trending bull regime:
+- CAN SLIM has a 62% win rate with +8% average alpha, so it earns a weight of 0.35.
+- Dan Zanger cup-handle sits at 0.25 thanks to moderate hit rate but lower volatility.
+- Trend-following has not kept up (45% win rate), so after decay it contributes 0.20.
+- Livermore breakout is highly correlated with CAN SLIM this week; the diversification penalty nudges it down to 0.20.
+The final score is the weighted sum of the latest confidences using those weights. If any strategy is missing data, we gracefully fall back to equal shares so the blend always resolves.
+
+### Visual Guides & Upcoming Pages
+We are planning a dedicated **Strategy Health** page under `/diagnostics/strategy-weights` that will include:
+- Weight contribution bars and sparklines so you can see how influence shifts over time.
+- Regime timelines that annotate when the system switches between trending and range-bound states.
+- Correlation heatmaps and scatter plots comparing alpha versus drawdown, helping you spot redundant strategies.
+- A walkthrough card explaining the weighting math with the same example above, so new teammates can follow along without digging into code.
+
+These visuals will land alongside the database models for tracking regime-specific metrics. Until then, refer back to this section to understand how the upcoming weighting logic will behave and how to communicate it to stakeholders.
+
 ## Next Steps
 1. **Calibrate Parameters** – Tailor `strategy_weights` and risk controls to your mandate before running live capital.
 2. **Integrate with Scheduling** – Use cron or Windows Task Scheduler to run `scan` and `health` commands weekly, leveraging the email alerts.

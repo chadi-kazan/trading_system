@@ -115,17 +115,12 @@
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
-
-
-
-
-
-
-
-
-
-
-
-
-
+## Weighing Strategies Initiative
+- [ ] Document the reliability-weighted scoring methodology in README with novice-friendly diagrams and examples.
+- [ ] Design SQLModel extensions (Strategy, MarketRegime, StrategyRegimeSnapshot, StrategyMetricHistory) and plan migrations for storing rolling metrics.
+- [ ] Implement FastAPI models and endpoints for reading/updating strategy performance metrics and reliability weights.
+- [ ] Build analytics job or CLI workflow to refresh rolling stats, regime detection, and exponential decay parameters.
+- [ ] Create frontend diagnostics pages and visualisations (weight trends, regime timelines, correlation heatmaps) backed by the new endpoints.
+- [ ] Integrate dynamic weights into dashboard scoring and expose per-strategy contributions across watchlist saves.
+- [ ] Add automated tests plus documentation updates covering the weighting pipeline and diagnostics UI.
 
