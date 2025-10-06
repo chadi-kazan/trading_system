@@ -94,6 +94,7 @@ Commands:
 - `refresh-fundamentals` - Download and cache Alpha Vantage fundamentals for seed symbols.
 - `schedule-fundamentals` - Run the fundamentals cache automation loop using configured schedules.
 - `refresh-russell` - Download the latest Russell 2000 constituent list.
+- `update-strategy-metrics` - Ingest reliability metrics from a JSON payload into the strategy weighting database.
 
 Example help:
 ```bash
@@ -336,6 +337,15 @@ We are planning a dedicated **Strategy Health** page under `/diagnostics/strateg
 - A walkthrough card explaining the weighting math with the same example above, so new teammates can follow along without digging into code.
 
 These visuals will land alongside the database models for tracking regime-specific metrics. Until then, refer back to this section to understand how the upcoming weighting logic will behave and how to communicate it to stakeholders.
+
+### Populating Metrics
+Use the CLI helper to upsert fresh reliability metrics after each analytics run:
+
+```bash
+python main.py update-strategy-metrics --input data/strategy_metrics_sample.json
+```
+
+Add `--dry-run` to preview without writing to the database. Each JSON object should include the strategy/regime identifiers, sample size, wins, and any computed fields (excess return, reliability_weight, correlation_penalty, extras, etc.). The new `/diagnostics/strategy-weights` page reflects the latest snapshots you ingest.
 
 ## Next Steps
 1. **Calibrate Parameters** – Tailor `strategy_weights` and risk controls to your mandate before running live capital.

@@ -17,6 +17,7 @@ from automation.fundamentals_refresh import (
     ValidationError as FundamentalsValidationError,
     run_scheduled_refresh,
 )
+from automation.strategy_metrics_refresh import load_and_ingest_metrics
 from backtesting.combiner import combine_equity_curves
 from backtesting.engine import BacktestingEngine
 from backtesting.runner import StrategyBacktestRunner
@@ -659,6 +660,21 @@ def handle_refresh_russell(args: argparse.Namespace, ctx: AppContext) -> int:
 
 
 def handle_refresh_datasets(args: argparse.Namespace, ctx: AppContext) -> int:
+
+
+def handle_update_strategy_metrics(args: argparse.Namespace, ctx: AppContext) -> int:
+    if not args.input:
+        logger.error("--input path is required")
+        return 1
+    input_path = Path(args.input)
+    try:
+        processed = load_and_ingest_metrics(input_path, dry_run=args.dry_run)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("Failed to ingest strategy metrics from %s: %s", input_path, exc)
+        return 1
+    suffix = " (dry run)" if args.dry_run else ""
+    logger.info("Ingested %d strategy metric record(s)%s", processed, suffix)
+    return 0
     api_key = ctx.config.data_sources.alpha_vantage_key
     if not api_key:
         logger.error("Alpha Vantage API key not configured; set data_sources.alpha_vantage_key or TS_ALPHA_VANTAGE_KEY.")
@@ -775,6 +791,11 @@ def build_parser() -> argparse.ArgumentParser:
     datasets.add_argument("--russell-dest", type=Path, help="Destination CSV path (default: storage.universe_dir/'russell_2000.csv')")
     datasets.add_argument("--skip-russell", action="store_true", help="Skip downloading the Russell 2000 list")
     datasets.set_defaults(handler=handle_refresh_datasets)
+
+    metrics = subparsers.add_parser("update-strategy-metrics", help="Upsert strategy reliability metrics from a JSON payload")
+    metrics.add_argument("--input", type=Path, required=True, help="Path to a JSON array of strategy metric records")
+    metrics.add_argument("--dry-run", action="store_true", help="Validate records without committing changes")
+    metrics.set_defaults(handler=handle_update_strategy_metrics)
 
     schedule = subparsers.add_parser("schedule-fundamentals", help="Run scheduled fundamentals refresh automation")
     schedule.add_argument("--seed-candidates", type=Path, help="Optional seed candidates CSV override")

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import json
+import os
 from datetime import datetime
 from pathlib import Path
 from typing import Iterable, Optional
@@ -14,7 +15,7 @@ from sqlmodel import Field, Session, SQLModel, create_engine
 
 DATA_DIR = Path("data")
 DATA_DIR.mkdir(parents=True, exist_ok=True)
-DB_PATH = DATA_DIR / "strategy_metrics.db"
+DB_PATH = Path(os.getenv("STRATEGY_METRICS_DB_PATH", DATA_DIR / "strategy_metrics.db"))
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
 

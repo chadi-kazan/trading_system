@@ -1,0 +1,36 @@
+[
+  {
+    "strategy_id": "can_slim",
+    "strategy_label": "CAN SLIM",
+    "regime_slug": "bull_trending",
+    "regime_name": "Bull Trending",
+    "sample_size": 45,
+    "wins": 30,
+    "avg_excess_return": 0.09,
+    "volatility": 0.14,
+    "max_drawdown": 0.18,
+    "reliability_weight": 0.68,
+    "correlation_penalty": 0.12,
+    "regime_fit": 0.82,
+    "decay_lambda": 0.25,
+    "last_sampled_at": "2025-10-05T14:00:00",
+    "extras": {"notes": "Derived from weekly scan analytics"}
+  },
+  {
+    "strategy_id": "trend_following",
+    "strategy_label": "Trend Following",
+    "regime_slug": "range_bound",
+    "regime_name": "Range Bound",
+    "sample_size": 38,
+    "wins": 18,
+    "avg_excess_return": 0.03,
+    "volatility": 0.11,
+    "max_drawdown": 0.22,
+    "reliability_weight": 0.41,
+    "correlation_penalty": 0.08,
+    "regime_fit": 0.55,
+    "decay_lambda": 0.3,
+    "last_sampled_at": "2025-10-05T14:00:00",
+    "extras": {"window": "Q3 performance"}
+  }
+]
