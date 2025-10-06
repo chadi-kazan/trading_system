@@ -88,3 +88,46 @@ export type WatchlistItem = {
   final_scores: StrategyScore[];
   aggregated_signal?: AggregatedSignal | null;
 };
+export type StrategyMetricHistory = {
+  observed_at: string;
+  reliability_weight?: number | null;
+  avg_excess_return?: number | null;
+  volatility?: number | null;
+  max_drawdown?: number | null;
+  win_rate?: number | null;
+  sample_size?: number | null;
+  correlation_penalty?: number | null;
+  regime_fit?: number | null;
+  decay_lambda?: number | null;
+  extras: Record<string, unknown>;
+};
+
+export type StrategyMetricSummary = {
+  strategy: {
+    id: string;
+    label: string;
+    description?: string | null;
+    default_weight?: number | null;
+  };
+  regime: {
+    slug: string;
+    name: string;
+    description?: string | null;
+    detection_notes?: string | null;
+  };
+  sample_size: number;
+  wins: number;
+  win_rate?: number | null;
+  avg_excess_return?: number | null;
+  volatility?: number | null;
+  max_drawdown?: number | null;
+  decay_lambda?: number | null;
+  reliability_weight?: number | null;
+  correlation_penalty?: number | null;
+  regime_fit?: number | null;
+  last_sampled_at?: string | null;
+  updated_at: string;
+  extras: Record<string, unknown>;
+  history: StrategyMetricHistory[];
+};
+

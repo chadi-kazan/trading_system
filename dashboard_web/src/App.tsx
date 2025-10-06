@@ -11,8 +11,10 @@ import { FinalScoreChart } from "./components/FinalScoreChart";
 import { WatchlistPage } from "./pages/WatchlistPage";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
+import { StrategyWeightsPage } from "./pages/StrategyWeightsPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
+import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
 
 const THREE_YEARS_AGO = new Date();
 THREE_YEARS_AGO.setDate(THREE_YEARS_AGO.getDate() - 365 * 3);
@@ -56,10 +58,12 @@ function DashboardPage({
   strategiesMeta,
   onSave,
   watchlistItems,
+  strategyWeights,
 }: {
   strategiesMeta: StrategyInfo[];
   onSave: (payload: SavePayload) => Promise<void> | void;
   watchlistItems: SavedSignal[];
+  strategyWeights: Record<string, number>;
 }) {
   const location = useLocation();
   const navigate = useNavigate();
@@ -90,9 +94,20 @@ function DashboardPage({
       };
     });
   }, [strategyCards]);
-  const averageScore = finalScores.length
-    ? finalScores.reduce((sum, entry) => sum + entry.value, 0) / finalScores.length
-    : 0;
+  const averageScore = useMemo(() => {
+    if (finalScores.length === 0) {
+      return 0;
+    }
+    const weightedSum = finalScores.reduce((sum, entry) => {
+      const weight = strategyWeights[entry.name] ?? 0;
+      return sum + entry.value * weight;
+    }, 0);
+    const totalWeight = finalScores.reduce((sum, entry) => sum + (strategyWeights[entry.name] ?? 0), 0);
+    if (totalWeight > 0) {
+      return weightedSum / totalWeight;
+    }
+    return finalScores.reduce((sum, entry) => sum + entry.value, 0) / finalScores.length;
+  }, [finalScores, strategyWeights]);
   const latestAggregated = aggregatedSignals.at(-1) ?? null;
 
   useEffect(() => {
@@ -304,6 +319,7 @@ const navLinks = [
   { label: "Signal Guide", to: "/guides/signals" },
   { label: "Glossary", to: "/guides/glossary" },
   { label: "Watchlist", to: "/watchlist" },
+  { label: "Strategy Health", to: "/diagnostics/strategy-weights" },
 ];
 
 function AppLayout({
@@ -311,11 +327,13 @@ function AppLayout({
   watchlistItems,
   handleSaveWatchlist,
   removeFromWatchlist,
+  strategyWeights,
 }: {
   strategies: StrategyInfo[];
   watchlistItems: SavedSignal[];
   handleSaveWatchlist: (payload: SavePayload) => void;
   removeFromWatchlist: (id: string) => Promise<void>;
+  strategyWeights: Record<string, number>;
 }) {
   return (
     <div className="min-h-screen bg-slate-50">
@@ -351,11 +369,19 @@ function AppLayout({
       <Routes>
         <Route
           path="/"
-          element={<DashboardPage strategiesMeta={strategies} onSave={handleSaveWatchlist} watchlistItems={watchlistItems} />}
+          element={
+            <DashboardPage
+              strategiesMeta={strategies}
+              onSave={handleSaveWatchlist}
+              watchlistItems={watchlistItems}
+              strategyWeights={strategyWeights}
+            />
+          }
         />
         <Route path="/guides/signals" element={<SignalGuide />} />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/watchlist" element={<WatchlistPage items={watchlistItems} remove={removeFromWatchlist} />} />
+        <Route path="/diagnostics/strategy-weights" element={<StrategyWeightsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
@@ -365,6 +391,29 @@ function AppLayout({
 export default function App() {
   const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
   const { items: watchlistItems, save: persistWatchlist, remove } = useWatchlist();
+  const { metrics: strategyMetrics } = useStrategyMetrics(false);
+
+  const strategyWeights = useMemo(() => {
+    const latest = new Map<string, { weight: number; updatedAt: number }>();
+    strategyMetrics.forEach((entry) => {
+      if (entry.reliability_weight === null || entry.reliability_weight === undefined) {
+        return;
+      }
+      const updatedAt = new Date(entry.updated_at).getTime();
+      if (Number.isNaN(updatedAt)) {
+        return;
+      }
+      const existing = latest.get(entry.strategy.id);
+      if (!existing || updatedAt > existing.updatedAt) {
+        latest.set(entry.strategy.id, { weight: entry.reliability_weight, updatedAt });
+      }
+    });
+    const result: Record<string, number> = {};
+    latest.forEach((value, key) => {
+      result[key] = value.weight;
+    });
+    return result;
+  }, [strategyMetrics]);
 
   useEffect(() => {
     fetchStrategies().then(setStrategies).catch((err) => console.error(err));
@@ -387,6 +436,7 @@ export default function App() {
         watchlistItems={watchlistItems}
         handleSaveWatchlist={handleSaveWatchlist}
         removeFromWatchlist={remove}
+        strategyWeights={strategyWeights}
       />
     </BrowserRouter>
   );

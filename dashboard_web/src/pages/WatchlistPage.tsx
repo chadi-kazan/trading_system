@@ -1,9 +1,9 @@
 import { useMemo, useState } from "react";
-import { formatDistanceToNow } from "date-fns";
 import { useNavigate } from "react-router-dom";
 import type { SavedSignal, WatchlistStatus } from "../hooks/useWatchlist";
 import { FinalScoreChart } from "../components/FinalScoreChart";
 import { WATCHLIST_STATUSES } from "../hooks/useWatchlist";
+import { formatDisplayDate } from "../utils/date";
 
 interface WatchlistPageProps {
   items: SavedSignal[];
@@ -69,7 +69,7 @@ export function WatchlistPage({ items, remove }: WatchlistPageProps) {
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <div>
                   <h2 className="text-xl font-semibold text-slate-900">{item.symbol}</h2>
-                  <p className="text-xs text-slate-500">Saved {formatDistanceToNow(new Date(item.savedAt), { addSuffix: true })}</p>
+                  <p className="text-xs text-slate-500">Saved on {formatDisplayDate(item.savedAt)}</p>
                 </div>
                 <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold ${STATUS_COLORS[item.status]}`}>
                   {item.status}

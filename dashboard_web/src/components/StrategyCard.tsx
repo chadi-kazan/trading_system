@@ -13,6 +13,7 @@ import {
   YAxis,
 } from "recharts";
 import type { StrategyAnalysis } from "../types";
+import { formatDisplayDate } from "../utils/date";
 
 interface StrategyCardProps {
   strategy: StrategyAnalysis;
@@ -66,7 +67,7 @@ function getBadge(strategy: StrategyAnalysis): { tone: "positive" | "neutral" | 
 
 function renderConfidenceChart(strategy: StrategyAnalysis) {
   const confidenceData = strategy.signals.map((signal) => ({
-    date: new Date(signal.date).toLocaleDateString(),
+    date: formatDisplayDate(signal.date),
     confidence: signal.confidence,
   }));
 

@@ -1,6 +1,7 @@
 import type {
   AggregatedSignal,
   StrategyInfo,
+  StrategyMetricSummary,
   StrategyScore,
   SymbolAnalysis,
   SymbolSearchResult,
@@ -83,3 +84,9 @@ export async function deleteWatchlistItem(symbol: string): Promise<void> {
     throw new Error(message || `Failed to remove watchlist entry (${response.status})`);
   }
 }
+export async function fetchStrategyMetrics(includeHistory = true): Promise<StrategyMetricSummary[]> {
+  const params = includeHistory ? '?include_history=true' : '';
+  const response = await fetch(`${apiBase}/api/strategy-metrics${params}`);
+  return handleResponse<StrategyMetricSummary[]>(response);
+}
+

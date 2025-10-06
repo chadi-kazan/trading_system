@@ -1,5 +1,5 @@
-import { format } from "date-fns";
 import type { AggregatedSignal } from "../types";
+import { formatDisplayDate } from "../utils/date";
 
 interface AggregatedSignalsProps {
   signals: AggregatedSignal[];
@@ -31,7 +31,7 @@ export function AggregatedSignals({ signals }: AggregatedSignalsProps) {
       <h2 className="text-base font-semibold text-slate-900">Aggregated Signals</h2>
       <ul className="mt-4 space-y-3">
         {signals.map((signal, index) => {
-          const formattedDate = format(new Date(signal.date), "PPpp");
+          const formattedDate = formatDisplayDate(signal.date);
           const strategies = renderStrategyList(signal.metadata);
           const confidenceTone = signal.confidence >= 0.7 ? "text-emerald-600" : signal.confidence >= 0.5 ? "text-slate-600" : "text-amber-600";
 

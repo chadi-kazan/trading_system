@@ -123,4 +123,5 @@
 - [ ] Create frontend diagnostics pages and visualisations (weight trends, regime timelines, correlation heatmaps) backed by the new endpoints.
 - [ ] Integrate dynamic weights into dashboard scoring and expose per-strategy contributions across watchlist saves.
 - [ ] Add automated tests plus documentation updates covering the weighting pipeline and diagnostics UI.
+- [ ] Standardize dashboard date displays to dd-MMM-yyyy across diagnostics and watchlist views.
 

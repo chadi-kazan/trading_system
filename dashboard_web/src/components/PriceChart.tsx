@@ -11,6 +11,7 @@ import {
   YAxis,
 } from "recharts";
 import type { AggregatedSignal, PriceBar } from "../types";
+import { formatDisplayDate } from "../utils/date";
 
 interface PriceChartProps {
   data: PriceBar[];
@@ -64,7 +65,7 @@ function CustomTooltip({ active, payload, label }: any) {
 
 export function PriceChart({ data, annotations, latestAggregated }: PriceChartProps) {
   const chartData = data.map((bar) => ({
-    date: new Date(bar.date).toLocaleDateString(),
+    date: formatDisplayDate(bar.date),
     close: bar.close,
     fast_ema: bar.fast_ema ?? null,
     slow_ema: bar.slow_ema ?? null,
