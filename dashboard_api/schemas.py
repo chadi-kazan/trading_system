@@ -89,6 +89,34 @@ class SearchResponse(BaseModel):
     results: List[SymbolSearchResult]
 
 
+class RussellMomentumEntry(BaseModel):
+    symbol: str
+    name: Optional[str] = None
+    sector: Optional[str] = None
+    last_price: float
+    change_absolute: float
+    change_percent: float
+    reference_price: float
+    updated_at: datetime
+    volume: Optional[float] = None
+    average_volume: Optional[float] = None
+    relative_volume: Optional[float] = None
+    data_points: int
+
+
+class RussellMomentumResponse(BaseModel):
+    timeframe: str
+    generated_at: datetime
+    universe_size: int
+    evaluated_symbols: int
+    skipped_symbols: int
+    baseline_symbol: Optional[str] = None
+    baseline_change_percent: Optional[float] = None
+    baseline_last_price: Optional[float] = None
+    top_gainers: List[RussellMomentumEntry] = Field(default_factory=list)
+    top_losers: List[RussellMomentumEntry] = Field(default_factory=list)
+
+
 __all__ = [
     "AggregatedSignalPayload",
     "HealthResponse",
@@ -97,6 +125,8 @@ __all__ = [
     "StrategyAnalysis",
     "StrategyInfo",
     "StrategySignalPayload",
+    "RussellMomentumEntry",
+    "RussellMomentumResponse",
     "SymbolAnalysisResponse",
     "SymbolSearchResult",
 ]

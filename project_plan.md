@@ -127,7 +127,7 @@
 - [x] ~~Standardize dashboard date displays to dd-MMM-yyyy across diagnostics and watchlist views.~~
 
 ## Russell 2000 Momentum Initiative
-- [ ] Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD).
+- [x] ~~Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD). (Completed: 2025-10-07)~~
 - [ ] Build dashboard page with filters for top 50 rising vs best performers.
 - [ ] Wire navigation and watchlist integration for Russell picks.
 - [ ] Document the workflow and add smoke coverage.

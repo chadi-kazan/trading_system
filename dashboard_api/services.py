@@ -20,6 +20,7 @@ from strategies.aggregation import AggregationParams, SignalAggregator
 from strategies.base import Strategy, StrategySignal
 from strategies.trend_following import TrendFollowingStrategy
 from trading_system.config_manager import TradingSystemConfig
+from universe.candidates import load_russell_2000_candidates
 
 from .config import get_config
 from .metadata import STRATEGY_METADATA, STRATEGY_ORDER
@@ -31,6 +32,8 @@ from .schemas import (
     StrategySignalPayload,
     SymbolAnalysisResponse,
     SymbolSearchResult,
+    RussellMomentumEntry,
+    RussellMomentumResponse,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -333,6 +336,234 @@ class SignalService:
         )
 
 
+class RussellMomentumService:
+    """Compute Russell 2000 momentum snapshots for dashboard consumption."""
+
+    BASELINE_SYMBOL = "IWM"
+    MAX_LIMIT = 200
+    CACHE_TTL_SECONDS = 300.0
+    TIMEFRAME_CONFIG: Dict[str, Dict[str, Any]] = {
+        "day": {"window_days": 10, "reference_days": 1},
+        "week": {"window_days": 28, "reference_days": 5},
+        "month": {"window_days": 90, "reference_days": 21},
+        "ytd": {"window_days": 400, "reference_days": None},
+    }
+
+    def __init__(self, config: TradingSystemConfig | None = None) -> None:
+        self.config = config or get_config()
+        self.price_provider = YahooPriceProvider(
+            cache_dir=self.config.storage.price_cache_dir,
+            cache_ttl_days=self.config.data_sources.cache_days,
+        )
+        self._symbols: Optional[List[str]] = None
+        self._metadata: Optional[Dict[str, Dict[str, Optional[str]]]] = None
+        self._cache: Dict[Tuple[str, int], Tuple[float, RussellMomentumResponse]] = {}
+
+    # ------------------------------------------------------------------
+    # Public API
+    # ------------------------------------------------------------------
+    def get_momentum(self, timeframe: str, *, limit: int = 50) -> RussellMomentumResponse:
+        tf = (timeframe or "").strip().lower()
+        if tf not in self.TIMEFRAME_CONFIG:
+            raise ValueError(f"Unsupported timeframe '{timeframe}'. Choose from day, week, month, ytd.")
+
+        capped_limit = max(1, min(int(limit), self.MAX_LIMIT))
+        cache_key = (tf, capped_limit)
+        now = time.time()
+
+        cached = self._cache.get(cache_key)
+        if cached and now - cached[0] <= self.CACHE_TTL_SECONDS:
+            return cached[1].model_copy(deep=True)
+
+        symbols = self._load_symbols()
+        if not symbols:
+            raise RuntimeError("No Russell 2000 symbols available for analysis")
+
+        end_date = date.today()
+        start_date = self._compute_start_date(end_date, tf)
+
+        entries: List[RussellMomentumEntry] = []
+        skipped = 0
+
+        for symbol in symbols:
+            entry = self._evaluate_symbol(symbol, start_date, end_date, tf)
+            if entry is None:
+                skipped += 1
+                continue
+            entries.append(entry)
+
+        if not entries:
+            raise RuntimeError("Failed to compute momentum for any Russell 2000 constituents")
+
+        entries.sort(key=lambda item: item.change_percent, reverse=True)
+        top_gainers = entries[:capped_limit]
+
+        losers_sorted = sorted(entries, key=lambda item: item.change_percent)
+        negative_losers = [entry for entry in losers_sorted if entry.change_percent < 0]
+        if negative_losers:
+            top_losers = negative_losers[:capped_limit]
+        else:
+            top_losers = losers_sorted[:capped_limit]
+
+        baseline_entry = next((entry for entry in entries if entry.symbol == self.BASELINE_SYMBOL), None)
+
+        response = RussellMomentumResponse(
+            timeframe=tf,
+            generated_at=datetime.utcnow(),
+            universe_size=len(symbols),
+            evaluated_symbols=len(entries),
+            skipped_symbols=skipped,
+            baseline_symbol=self.BASELINE_SYMBOL if baseline_entry else None,
+            baseline_change_percent=baseline_entry.change_percent if baseline_entry else None,
+            baseline_last_price=baseline_entry.last_price if baseline_entry else None,
+            top_gainers=top_gainers,
+            top_losers=top_losers,
+        )
+
+        self._cache[cache_key] = (now, response)
+        return response.model_copy(deep=True)
+
+    # ------------------------------------------------------------------
+    # Internal helpers
+    # ------------------------------------------------------------------
+    def _load_symbols(self) -> List[str]:
+        if self._symbols is None:
+            symbols = load_russell_2000_candidates()
+            self._symbols = [symbol for symbol in symbols if symbol]
+        return self._symbols
+
+    def _load_metadata(self) -> Dict[str, Dict[str, Optional[str]]]:
+        if self._metadata is not None:
+            return self._metadata
+
+        metadata: Dict[str, Dict[str, Optional[str]]] = {}
+        universe_dir = self.config.storage.universe_dir
+        sources = [
+            universe_dir / "seed_candidates.csv",
+            universe_dir / "yahoo_small_caps.csv",
+            universe_dir / "russell_2000.csv",
+        ]
+        for path in sources:
+            if not path.exists():
+                continue
+            try:
+                frame = pd.read_csv(path)
+            except Exception:
+                continue
+            if "symbol" not in frame.columns:
+                continue
+            for _, row in frame.iterrows():
+                symbol = str(row.get("symbol") or "").strip().upper()
+                if not symbol:
+                    continue
+                name = str(row.get("name") or "").strip() or None
+                sector = str(row.get("sector") or "").strip() or None
+                metadata[symbol] = {
+                    "name": name,
+                    "sector": sector,
+                }
+        self._metadata = metadata
+        return metadata
+
+    def _compute_start_date(self, end_date: date, timeframe: str) -> date:
+        config = self.TIMEFRAME_CONFIG[timeframe]
+        if timeframe == "ytd":
+            return date(end_date.year, 1, 1)
+        window_days = max(int(config["window_days"]), 1)
+        return end_date - timedelta(days=window_days)
+
+    def _evaluate_symbol(
+        self,
+        symbol: str,
+        start_date: date,
+        end_date: date,
+        timeframe: str,
+    ) -> Optional[RussellMomentumEntry]:
+        try:
+            result = self.price_provider.get_price_history(
+                PriceRequest(symbol=symbol, start=start_date, end=end_date, interval="1d")
+            )
+        except Exception as exc:
+            LOGGER.debug("Price download failed for %s: %s", symbol, exc)
+            return None
+
+        frame = result.data
+        if frame.empty or "close" not in frame.columns:
+            return None
+
+        reference_price = self._select_reference_price(frame, timeframe)
+        if reference_price is None or reference_price <= 0:
+            return None
+
+        latest_row = frame.iloc[-1]
+        last_close = _safe_float(latest_row.get("close"))
+        change_absolute = last_close - reference_price
+        change_percent = (change_absolute / reference_price) * 100.0 if reference_price else 0.0
+
+        volume = latest_row.get("volume")
+        volume_value = _maybe_float(volume)
+        average_volume = None
+        relative_volume = None
+        if "volume" in frame.columns:
+            average_volume = _maybe_float(frame["volume"].tail(20).mean())
+            if average_volume and average_volume > 0 and volume_value is not None:
+                relative_volume = volume_value / average_volume
+
+        metadata = self._load_metadata().get(symbol, {})
+
+        return RussellMomentumEntry(
+            symbol=symbol,
+            name=metadata.get("name") or symbol,
+            sector=metadata.get("sector"),
+            last_price=last_close,
+            change_absolute=change_absolute,
+            change_percent=change_percent,
+            reference_price=reference_price,
+            updated_at=_ensure_datetime(frame.index[-1]),
+            volume=volume_value,
+            average_volume=average_volume,
+            relative_volume=relative_volume,
+            data_points=len(frame.index),
+        )
+
+    def _select_reference_price(self, frame: pd.DataFrame, timeframe: str) -> Optional[float]:
+        if frame.empty:
+            return None
+
+        config = self.TIMEFRAME_CONFIG[timeframe]
+        last_index = frame.index[-1]
+
+        if timeframe == "day":
+            if len(frame.index) < 2:
+                return None
+            return _safe_float(frame.iloc[-2].get("close"))
+
+        if timeframe == "week":
+            target = last_index - timedelta(days=7)
+            subset = frame.loc[frame.index <= target]
+        elif timeframe == "month":
+            target = last_index - timedelta(days=31)
+            subset = frame.loc[frame.index <= target]
+        elif timeframe == "ytd":
+            year_start = datetime(last_index.year, 1, 1)
+            subset = frame.loc[frame.index >= year_start]
+            if not subset.empty:
+                return _safe_float(subset.iloc[0].get("close"))
+            subset = frame
+        else:
+            reference_days = config.get("reference_days")
+            if not reference_days:
+                return None
+            target = last_index - timedelta(days=int(reference_days))
+            subset = frame.loc[frame.index <= target]
+
+        if subset.empty:
+            if len(frame.index) < 2:
+                return None
+            subset = frame.iloc[[0]]
+        return _safe_float(subset.iloc[-1].get("close"))
+
+
 # ----------------------------------------------------------------------
 # Helper functions
 # ----------------------------------------------------------------------
@@ -390,6 +621,6 @@ def _normalise_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     return normalised
 
 
-__all__ = ["SignalService", "RateLimitError"]
+__all__ = ["SignalService", "RussellMomentumService", "RateLimitError"]
 
 
