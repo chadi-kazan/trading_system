@@ -30,7 +30,8 @@ Every capability is orchestrated by `main.py`, which exposes a cohesive CLI whil
 8. [Cloud Deployment](#cloud-deployment)
 9. [Watchlist Persistence & Dashboard Integration](#watchlist-persistence--dashboard-integration)
 10. [Strategy Weighting Overview](#strategy-weighting-overview)
-11. [Next Steps](#next-steps)
+11. [Russell 2000 Momentum Explorer](#russell-2000-momentum-explorer)
+12. [Next Steps](#next-steps)
 ---
 
 ## Prerequisites & Installation
@@ -347,16 +348,28 @@ python main.py update-strategy-metrics --input data/strategy_metrics_sample.json
 
 Add `--dry-run` to preview without writing to the database. Each JSON object should include the strategy/regime identifiers, sample size, wins, and any computed fields (excess return, reliability_weight, correlation_penalty, extras, etc.). The new `/diagnostics/strategy-weights` page reflects the latest snapshots you ingest.
 
+## Russell 2000 Momentum Explorer
+
+Use the `/api/russell/momentum` endpoint or the dashboard route `/russell/momentum` to scan Russell 2000 constituents for strength and underperformance. Timeframe toggles (day, week, month, YTD) adjust the lookback window, and the limit selector controls how many symbols appear in each leaderboard. Every payload includes the Russell 2000 ETF baseline so you can benchmark moves.
+
+- `Top Risers` lists the best percentage movers in descending order.
+- `Underperformers` highlights the weakest names so you can flag breakdown risk or potential mean-reversion setups.
+- Each row lets you stage a preferred watchlist status, push the symbol into the shared watchlist, or jump straight into the main dashboard with the selection pre-loaded.
+- Volume columns show the raw print plus relative volume to help confirm participation.
+
+Example API usage:
+
+```bash
+curl "http://localhost:8000/api/russell/momentum?timeframe=week&limit=25"
+```
+
 ## Next Steps
 1. **Calibrate Parameters** - Tailor `strategy_weights` and risk controls to your mandate before running live capital.
 2. **Integrate with Scheduling** - Use cron or Windows Task Scheduler to run `scan`, `health`, and `update-strategy-metrics` so diagnostics stay current.
 3. **Enrich Seed Universe** - Incorporate Russell 2000 constituents or custom watchlists for broader discovery.
 4. **Extend Strategies** - Add new modules in `strategies/` and register them in `STRATEGY_FACTORIES` for inclusion in CLI workflows.
 5. **Enhance Notebooks** - Build custom dashboards atop the generated CSV outputs for investment committee presentations.
-6. **Russell 2000 Momentum Explorer**
-   - [ ] Implement API endpoint to surface top 50 performers with selectable timeframes (day/week/month/YTD).
-   - [ ] Build frontend page with filters for rising vs best performers and link to symbol drill-downs.
-   - [ ] Wire navigation/watchlist affordances and document the workflow.
+6. **Russell 2000 Momentum Explorer** - Use the `/russell/momentum` page to triage leaders and laggards, then hand symbols off to the main dashboard or watchlist with one click.
 
 
 

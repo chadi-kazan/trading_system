@@ -130,4 +130,4 @@
 - [x] ~~Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD). (Completed: 2025-10-07)~~
 - [x] ~~Build dashboard page with filters for top 50 rising vs best performers. (Completed: 2025-10-07)~~
 - [x] ~~Wire navigation and watchlist integration for Russell picks. (Completed: 2025-10-07)~~
-- [ ] Document the workflow and add smoke coverage.
+- [x] ~~Document the workflow and add smoke coverage. (Completed: 2025-10-07)~~
