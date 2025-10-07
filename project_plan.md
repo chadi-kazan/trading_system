@@ -115,6 +115,7 @@
 - [ ] Update this plan after each completed task/sub-task with notes and new discoveries. (Last refreshed 2025-10-04)
 - [ ] Maintain logging, error handling, and documentation parity with implemented features. (Docs refresh pending for new backtest pipeline)
 - [ ] Integrate broader candidate feed (e.g., Russell 2000 constituents) for richer universe seeds.
+- [ ] Automate daily `update-strategy-metrics` runs after analytics or backtests to keep diagnostics current.
 ## Weighing Strategies Initiative
 - [x] ~~Document the reliability-weighted scoring methodology in README with novice-friendly diagrams and examples.~~
 - [x] ~~Design SQLModel extensions (Strategy, MarketRegime, StrategyRegimeSnapshot, StrategyMetricHistory) and plan migrations for storing rolling metrics.~~
@@ -125,3 +126,8 @@
 - [x] ~~Add automated tests plus documentation updates covering the weighting pipeline and diagnostics UI.~~
 - [x] ~~Standardize dashboard date displays to dd-MMM-yyyy across diagnostics and watchlist views.~~
 
+## Russell 2000 Momentum Initiative
+- [ ] Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD).
+- [ ] Build dashboard page with filters for top 50 rising vs best performers.
+- [ ] Wire navigation and watchlist integration for Russell picks.
+- [ ] Document the workflow and add smoke coverage.

@@ -348,11 +348,17 @@ python main.py update-strategy-metrics --input data/strategy_metrics_sample.json
 Add `--dry-run` to preview without writing to the database. Each JSON object should include the strategy/regime identifiers, sample size, wins, and any computed fields (excess return, reliability_weight, correlation_penalty, extras, etc.). The new `/diagnostics/strategy-weights` page reflects the latest snapshots you ingest.
 
 ## Next Steps
-1. **Calibrate Parameters** – Tailor `strategy_weights` and risk controls to your mandate before running live capital.
-2. **Integrate with Scheduling** – Use cron or Windows Task Scheduler to run `scan` and `health` commands weekly, leveraging the email alerts.
-3. **Enrich Seed Universe** – Incorporate Russell 2000 constituents or custom watchlists for broader discovery.
-4. **Extend Strategies** – Add new modules in `strategies/` and register them in `STRATEGY_FACTORIES` for inclusion in CLI workflows.
-5. **Enhance Notebooks** – Build custom dashboards atop the generated CSV outputs for investment committee presentations.
+1. **Calibrate Parameters** - Tailor `strategy_weights` and risk controls to your mandate before running live capital.
+2. **Integrate with Scheduling** - Use cron or Windows Task Scheduler to run `scan`, `health`, and `update-strategy-metrics` so diagnostics stay current.
+3. **Enrich Seed Universe** - Incorporate Russell 2000 constituents or custom watchlists for broader discovery.
+4. **Extend Strategies** - Add new modules in `strategies/` and register them in `STRATEGY_FACTORIES` for inclusion in CLI workflows.
+5. **Enhance Notebooks** - Build custom dashboards atop the generated CSV outputs for investment committee presentations.
+6. **Russell 2000 Momentum Explorer**
+   - [ ] Implement API endpoint to surface top 50 performers with selectable timeframes (day/week/month/YTD).
+   - [ ] Build frontend page with filters for rising vs best performers and link to symbol drill-downs.
+   - [ ] Wire navigation/watchlist affordances and document the workflow.
+
+
 
 The system is intentionally modular—adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
 
