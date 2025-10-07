@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { fetchRussellMomentum } from "../api";
 import type { RussellMomentumEntry, RussellMomentumResponse, RussellTimeframe } from "../types";
+import type { SavedSignal, WatchlistStatus } from "../hooks/useWatchlist";
+import { WATCHLIST_STATUSES } from "../hooks/useWatchlist";
 
 const TIMEFRAME_OPTIONS: Array<{ label: string; value: RussellTimeframe; hint: string }> = [
   { label: "1 Day", value: "day", hint: "Yesterday's close vs latest close." },
@@ -17,6 +20,11 @@ const VIEW_OPTIONS: Array<{ label: string; value: LeaderboardView; description: 
   { label: "Top Risers", value: "gainers", description: "Strongest percentage moves over the selected window." },
   { label: "Underperformers", value: "laggards", description: "Weakest percentage moves over the selected window." },
 ];
+
+type RussellMomentumPageProps = {
+  watchlistItems: SavedSignal[];
+  onSaveWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
+};
 
 function formatPercent(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
@@ -60,7 +68,8 @@ function getRankClass(changePercent: number): string {
   return "bg-slate-200 text-slate-600";
 }
 
-export function RussellMomentumPage(): JSX.Element {
+export function RussellMomentumPage({ watchlistItems, onSaveWatchlist }: RussellMomentumPageProps): JSX.Element {
+  const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState<RussellTimeframe>("week");
   const [limit, setLimit] = useState<number>(50);
   const [view, setView] = useState<LeaderboardView>("gainers");
@@ -68,6 +77,53 @@ export function RussellMomentumPage(): JSX.Element {
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
   const [refreshToken, setRefreshToken] = useState<number>(0);
+  const [statusOverrides, setStatusOverrides] = useState<Record<string, WatchlistStatus>>({});
+  const [savingSymbol, setSavingSymbol] = useState<string | null>(null);
+  const [saveFeedback, setSaveFeedback] = useState<Record<string, { type: "success" | "error"; message: string }>>({});
+  const watchlistMap = useMemo(() => {
+    const map = new Map<string, SavedSignal>();
+    watchlistItems.forEach((item) => {
+      map.set(item.symbol.toUpperCase(), item);
+    });
+    return map;
+  }, [watchlistItems]);
+  const defaultStatus = WATCHLIST_STATUSES[0];
+
+  const getSelectedStatus = (symbol: string): WatchlistStatus => {
+    const upper = symbol.toUpperCase();
+    return statusOverrides[upper] ?? watchlistMap.get(upper)?.status ?? defaultStatus;
+  };
+
+  const handleStatusChange = (symbol: string, status: WatchlistStatus) => {
+    const upper = symbol.toUpperCase();
+    setStatusOverrides((prev) => ({ ...prev, [upper]: status }));
+  };
+
+  const handleSaveSymbol = async (symbol: string) => {
+    const upper = symbol.toUpperCase();
+    const status = getSelectedStatus(upper);
+    setSavingSymbol(upper);
+    try {
+      await onSaveWatchlist(upper, status);
+      setSaveFeedback((prev) => ({
+        ...prev,
+        [upper]: { type: "success", message: `Tracked as ${status}` },
+      }));
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Failed to update watchlist";
+      setSaveFeedback((prev) => ({
+        ...prev,
+        [upper]: { type: "error", message },
+      }));
+    } finally {
+      setSavingSymbol(null);
+    }
+  };
+
+  const handleAnalyzeSymbol = (symbol: string) => {
+    const status = getSelectedStatus(symbol);
+    navigate("/", { state: { symbol: symbol.toUpperCase(), status } });
+  };
 
   useEffect(() => {
     let cancelled = false;
@@ -246,13 +302,29 @@ export function RussellMomentumPage(): JSX.Element {
                   <th className="py-3 pr-4 text-right">Volume</th>
                   <th className="py-3 pr-4 text-right">Rel. Vol</th>
                   <th className="py-3 pr-4 text-right">Data Points</th>
-                  <th className="py-3 pl-4 text-right">Updated</th>
+                  <th className="py-3 pr-4 text-right">Updated</th>
+                  <th className="py-3 pr-4 text-right">Watchlist</th>
+                  <th className="py-3 pl-4 text-right">Quick Actions</th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {entries.map((entry, index) => (
-                  <TableRow key={entry.symbol} entry={entry} index={index} />
-                ))}
+                {entries.map((entry, index) => {
+                  const symbolKey = entry.symbol.toUpperCase();
+                  return (
+                    <TableRow
+                      key={entry.symbol}
+                      entry={entry}
+                      index={index}
+                      currentStatus={getSelectedStatus(symbolKey)}
+                      onStatusChange={handleStatusChange}
+                      onSaveWatchlist={handleSaveSymbol}
+                      onAnalyze={handleAnalyzeSymbol}
+                      isSaving={savingSymbol === symbolKey}
+                      feedback={saveFeedback[symbolKey] ?? null}
+                      isTracked={watchlistMap.has(symbolKey)}
+                    />
+                  );
+                })}
               </tbody>
             </table>
           </div>
@@ -291,7 +363,29 @@ function SummaryTile({
   );
 }
 
-function TableRow({ entry, index }: { entry: RussellMomentumEntry; index: number }) {
+type TableRowProps = {
+  entry: RussellMomentumEntry;
+  index: number;
+  currentStatus: WatchlistStatus;
+  onStatusChange: (symbol: string, status: WatchlistStatus) => void;
+  onSaveWatchlist: (symbol: string) => void;
+  onAnalyze: (symbol: string) => void;
+  isSaving: boolean;
+  feedback: { type: "success" | "error"; message: string } | null;
+  isTracked: boolean;
+};
+
+function TableRow({
+  entry,
+  index,
+  currentStatus,
+  onStatusChange,
+  onSaveWatchlist,
+  onAnalyze,
+  isSaving,
+  feedback,
+  isTracked,
+}: TableRowProps): JSX.Element {
   const changeClass =
     entry.change_percent > 0
       ? "text-emerald-600"
@@ -300,6 +394,15 @@ function TableRow({ entry, index }: { entry: RussellMomentumEntry; index: number
         : "text-slate-600";
   const relativeVolume = entry.relative_volume ?? null;
   const lastUpdated = new Date(entry.updated_at);
+  const statusId = `status-${entry.symbol}`;
+  const trackLabel = isTracked ? "Update" : "Add";
+  const feedbackClass =
+    feedback?.type === "success"
+      ? "text-emerald-600"
+      : feedback?.type === "error"
+        ? "text-rose-600"
+        : "text-slate-500";
+
   return (
     <tr className="align-middle">
       <td className="whitespace-nowrap py-3 pr-4">
@@ -331,8 +434,53 @@ function TableRow({ entry, index }: { entry: RussellMomentumEntry; index: number
         ) : null}
       </td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{entry.data_points}</td>
-      <td className="whitespace-nowrap py-3 pl-4 text-right text-slate-400">
+      <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-400">
         {Number.isNaN(lastUpdated.getTime()) ? "—" : lastUpdated.toLocaleDateString()}
+      </td>
+      <td className="whitespace-nowrap py-3 pr-4 text-right">
+        <div className="flex flex-col items-end gap-2">
+          <select
+            id={statusId}
+            value={currentStatus}
+            onChange={(event) => onStatusChange(entry.symbol, event.target.value as WatchlistStatus)}
+            className="rounded-md border border-slate-200 bg-white px-3 py-2 text-xs shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+          >
+            {WATCHLIST_STATUSES.map((status) => (
+              <option key={status} value={status}>
+                {status}
+              </option>
+            ))}
+          </select>
+          {isTracked ? (
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">
+              Tracked
+            </span>
+          ) : null}
+        </div>
+      </td>
+      <td className="whitespace-nowrap py-3 pl-4 text-right">
+        <div className="flex flex-wrap justify-end gap-2">
+          <button
+            type="button"
+            onClick={() => onSaveWatchlist(entry.symbol)}
+            disabled={isSaving}
+            className={`inline-flex items-center rounded-md border px-3 py-1.5 text-xs font-semibold transition ${
+              isSaving
+                ? "cursor-not-allowed border-slate-200 bg-slate-100 text-slate-400"
+                : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600"
+            }`}
+          >
+            {isSaving ? "Saving…" : `${trackLabel} Watchlist`}
+          </button>
+          <button
+            type="button"
+            onClick={() => onAnalyze(entry.symbol)}
+            className="inline-flex items-center rounded-md border border-blue-500 bg-blue-500 px-3 py-1.5 text-xs font-semibold text-white shadow-sm transition hover:bg-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-300 focus:ring-offset-2"
+          >
+            Analyze
+          </button>
+        </div>
+        {feedback ? <p className={`mt-1 text-xs ${feedbackClass}`}>{feedback.message}</p> : null}
       </td>
     </tr>
   );

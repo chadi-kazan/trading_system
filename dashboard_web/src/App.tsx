@@ -381,7 +381,15 @@ function AppLayout({
           }
         />
         <Route path="/guides/signals" element={<SignalGuide />} />
-        <Route path="/russell/momentum" element={<RussellMomentumPage />} />
+        <Route
+          path="/russell/momentum"
+          element={
+            <RussellMomentumPage
+              watchlistItems={watchlistItems}
+              onSaveWatchlist={handleQuickWatchlist}
+            />
+          }
+        />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/watchlist" element={<WatchlistPage items={watchlistItems} remove={removeFromWatchlist} />} />
         <Route path="/diagnostics/strategy-weights" element={<StrategyWeightsPage />} />
@@ -431,6 +439,15 @@ export default function App() {
       aggregated_signal: aggregatedSignal ?? null,
     });
   };
+
+  const handleQuickWatchlist = (symbol: string, status: WatchlistStatus) =>
+    persistWatchlist({
+      symbol: symbol.toUpperCase(),
+      status,
+      final_scores: [],
+      average_score: 0,
+      aggregated_signal: null,
+    });
 
   return (
     <BrowserRouter>
