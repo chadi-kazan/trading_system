@@ -128,6 +128,6 @@
 
 ## Russell 2000 Momentum Initiative
 - [x] ~~Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD). (Completed: 2025-10-07)~~
-- [ ] Build dashboard page with filters for top 50 rising vs best performers.
+- [x] ~~Build dashboard page with filters for top 50 rising vs best performers. (Completed: 2025-10-07)~~
 - [ ] Wire navigation and watchlist integration for Russell picks.
 - [ ] Document the workflow and add smoke coverage.

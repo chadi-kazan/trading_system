@@ -12,6 +12,7 @@ import { WatchlistPage } from "./pages/WatchlistPage";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
 import { StrategyWeightsPage } from "./pages/StrategyWeightsPage";
+import { RussellMomentumPage } from "./pages/RussellMomentumPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
@@ -316,7 +317,8 @@ function NotFoundPage() {
 
 const navLinks = [
   { label: "Dashboard", to: "/" },
-  { label: "Signal Guide", to: "/guides/signals" },
+  { label: "Signal Guides", to: "/guides/signals" },
+  { label: "Russell Momentum", to: "/russell/momentum" },
   { label: "Glossary", to: "/guides/glossary" },
   { label: "Watchlist", to: "/watchlist" },
   { label: "Strategy Health", to: "/diagnostics/strategy-weights" },
@@ -379,6 +381,7 @@ function AppLayout({
           }
         />
         <Route path="/guides/signals" element={<SignalGuide />} />
+        <Route path="/russell/momentum" element={<RussellMomentumPage />} />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/watchlist" element={<WatchlistPage items={watchlistItems} remove={removeFromWatchlist} />} />
         <Route path="/diagnostics/strategy-weights" element={<StrategyWeightsPage />} />

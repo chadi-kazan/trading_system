@@ -7,6 +7,8 @@ import type {
   SymbolSearchResult,
   WatchlistItem,
   WatchlistStatus,
+  RussellMomentumResponse,
+  RussellTimeframe,
 } from "./types";
 
 const DEFAULT_API_BASE = "http://localhost:8000";
@@ -88,5 +90,17 @@ export async function fetchStrategyMetrics(includeHistory = true): Promise<Strat
   const params = includeHistory ? '?include_history=true' : '';
   const response = await fetch(`${apiBase}/api/strategy-metrics${params}`);
   return handleResponse<StrategyMetricSummary[]>(response);
+}
+
+export async function fetchRussellMomentum(
+  timeframe: RussellTimeframe,
+  limit = 50,
+): Promise<RussellMomentumResponse> {
+  const params = new URLSearchParams({
+    timeframe,
+    limit: String(limit),
+  });
+  const response = await fetch(`${apiBase}/api/russell/momentum?${params.toString()}`);
+  return handleResponse<RussellMomentumResponse>(response);
 }
 

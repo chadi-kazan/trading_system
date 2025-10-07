@@ -131,3 +131,33 @@ export type StrategyMetricSummary = {
   history: StrategyMetricHistory[];
 };
 
+export type RussellTimeframe = "day" | "week" | "month" | "ytd";
+
+export type RussellMomentumEntry = {
+  symbol: string;
+  name?: string | null;
+  sector?: string | null;
+  last_price: number;
+  change_absolute: number;
+  change_percent: number;
+  reference_price: number;
+  updated_at: string;
+  volume?: number | null;
+  average_volume?: number | null;
+  relative_volume?: number | null;
+  data_points: number;
+};
+
+export type RussellMomentumResponse = {
+  timeframe: RussellTimeframe;
+  generated_at: string;
+  universe_size: number;
+  evaluated_symbols: number;
+  skipped_symbols: number;
+  baseline_symbol?: string | null;
+  baseline_change_percent?: number | null;
+  baseline_last_price?: number | null;
+  top_gainers: RussellMomentumEntry[];
+  top_losers: RussellMomentumEntry[];
+};
+
