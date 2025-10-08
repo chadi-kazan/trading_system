@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
+import type { JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchRussellMomentum } from "../api";
 import type { RussellMomentumEntry, RussellMomentumResponse, RussellTimeframe } from "../types";

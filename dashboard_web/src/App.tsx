@@ -328,12 +328,14 @@ function AppLayout({
   strategies,
   watchlistItems,
   handleSaveWatchlist,
+  handleQuickWatchlist,
   removeFromWatchlist,
   strategyWeights,
 }: {
   strategies: StrategyInfo[];
   watchlistItems: SavedSignal[];
   handleSaveWatchlist: (payload: SavePayload) => void;
+  handleQuickWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
   removeFromWatchlist: (id: string) => Promise<void>;
   strategyWeights: Record<string, number>;
 }) {
@@ -455,6 +457,7 @@ export default function App() {
         strategies={strategies}
         watchlistItems={watchlistItems}
         handleSaveWatchlist={handleSaveWatchlist}
+        handleQuickWatchlist={handleQuickWatchlist}
         removeFromWatchlist={remove}
         strategyWeights={strategyWeights}
       />

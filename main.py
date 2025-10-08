@@ -660,21 +660,6 @@ def handle_refresh_russell(args: argparse.Namespace, ctx: AppContext) -> int:
 
 
 def handle_refresh_datasets(args: argparse.Namespace, ctx: AppContext) -> int:
-
-
-def handle_update_strategy_metrics(args: argparse.Namespace, ctx: AppContext) -> int:
-    if not args.input:
-        logger.error("--input path is required")
-        return 1
-    input_path = Path(args.input)
-    try:
-        processed = load_and_ingest_metrics(input_path, dry_run=args.dry_run)
-    except Exception as exc:  # pragma: no cover - defensive logging
-        logger.error("Failed to ingest strategy metrics from %s: %s", input_path, exc)
-        return 1
-    suffix = " (dry run)" if args.dry_run else ""
-    logger.info("Ingested %d strategy metric record(s)%s", processed, suffix)
-    return 0
     api_key = ctx.config.data_sources.alpha_vantage_key
     if not api_key:
         logger.error("Alpha Vantage API key not configured; set data_sources.alpha_vantage_key or TS_ALPHA_VANTAGE_KEY.")
@@ -713,6 +698,21 @@ def handle_update_strategy_metrics(args: argparse.Namespace, ctx: AppContext) ->
     )
     print(f"Cached fundamentals for {refreshed} symbols")
     return status
+
+
+def handle_update_strategy_metrics(args: argparse.Namespace, ctx: AppContext) -> int:
+    if not args.input:
+        logger.error("--input path is required")
+        return 1
+    input_path = Path(args.input)
+    try:
+        processed = load_and_ingest_metrics(input_path, dry_run=args.dry_run)
+    except Exception as exc:  # pragma: no cover - defensive logging
+        logger.error("Failed to ingest strategy metrics from %s: %s", input_path, exc)
+        return 1
+    suffix = " (dry run)" if args.dry_run else ""
+    logger.info("Ingested %d strategy metric record(s)%s", processed, suffix)
+    return 0
 
 
 
