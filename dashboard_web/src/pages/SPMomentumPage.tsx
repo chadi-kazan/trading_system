@@ -1,27 +1,27 @@
 import type { JSX } from "react";
 import type { SavedSignal, WatchlistStatus } from "../hooks/useWatchlist";
 import { IndexMomentumPage } from "./IndexMomentumPage";
-import { fetchRussellMomentum } from "../api";
+import { fetchSpMomentum } from "../api";
 
-type RussellMomentumPageProps = {
+type SPMomentumPageProps = {
   watchlistItems: SavedSignal[];
   onSaveWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
 };
 
-export function RussellMomentumPage({
+export function SPMomentumPage({
   watchlistItems,
   onSaveWatchlist,
-}: RussellMomentumPageProps): JSX.Element {
+}: SPMomentumPageProps): JSX.Element {
   return (
     <IndexMomentumPage
-      title="Russell 2000 Momentum"
-      description="Scan Russell 2000 constituents for leadership trends, compare strategy scores, and push candidates into your watchlist."
-      fetchMomentum={fetchRussellMomentum}
+      title="S&P 500 Momentum"
+      description="Screen S&P 500 constituents for broad-market momentum, review strategy alignment, and fast-track names into the central watchlist."
+      fetchMomentum={fetchSpMomentum}
       watchlistItems={watchlistItems}
       onSaveWatchlist={onSaveWatchlist}
-      indexKey="Russell 2000"
+      indexKey="S&P 500"
     />
   );
 }
 
-export default RussellMomentumPage;
+export default SPMomentumPage;

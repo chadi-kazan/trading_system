@@ -126,8 +126,11 @@
 - [x] ~~Add automated tests plus documentation updates covering the weighting pipeline and diagnostics UI.~~
 - [x] ~~Standardize dashboard date displays to dd-MMM-yyyy across diagnostics and watchlist views.~~
 
-## Russell 2000 Momentum Initiative
+## Momentum Explorer Initiative
 - [x] ~~Implement Russell 2000 performance endpoint with configurable timeframes (day/week/month/YTD). (Completed: 2025-10-07)~~
 - [x] ~~Build dashboard page with filters for top 50 rising vs best performers. (Completed: 2025-10-07)~~
 - [x] ~~Wire navigation and watchlist integration for Russell picks. (Completed: 2025-10-07)~~
 - [x] ~~Document the workflow and add smoke coverage. (Completed: 2025-10-07)~~
+- [x] ~~Add S&P 500 momentum service and dashboard parity with Russell flows. (Completed: 2025-10-07)~~
+- [x] ~~Expose sortable strategy/final scores on momentum tables. (Completed: 2025-10-07)~~
+- [x] ~~Surface strategy tooltips with investment bounds on analysis cards. (Completed: 2025-10-07)~~

@@ -155,13 +155,28 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
     neutral: "bg-slate-100 text-slate-700 border border-slate-200",
     warning: "bg-amber-50 text-amber-700 border border-amber-200",
   };
+  const tooltipLines = [
+    strategy.description,
+    strategy.investment_bounds ? `Investment criteria: ${strategy.investment_bounds}` : null,
+  ].filter(Boolean);
+  const tooltipText = tooltipLines.join("\n");
 
   return (
     <article className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
-          <h3 className="text-base font-semibold text-slate-900">{strategy.label}</h3>
+          <h3
+            className="text-base font-semibold text-slate-900"
+            title={tooltipText.length > 0 ? tooltipText : undefined}
+          >
+            {strategy.label}
+          </h3>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">{strategy.description}</p>
+          {strategy.investment_bounds ? (
+            <p className="mt-1 text-xs text-slate-400">
+              Investment criteria: <span className="font-medium text-slate-500">{strategy.investment_bounds}</span>
+            </p>
+          ) : null}
         </div>
         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeStyles[badge.tone]}`}>
           {badge.text}

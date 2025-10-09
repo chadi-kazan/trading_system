@@ -1,5 +1,7 @@
 import type {
   AggregatedSignal,
+  MomentumResponse,
+  MomentumTimeframe,
   StrategyInfo,
   StrategyMetricSummary,
   StrategyScore,
@@ -7,8 +9,6 @@ import type {
   SymbolSearchResult,
   WatchlistItem,
   WatchlistStatus,
-  RussellMomentumResponse,
-  RussellTimeframe,
 } from "./types";
 
 const DEFAULT_API_BASE = "http://localhost:8000";
@@ -93,14 +93,26 @@ export async function fetchStrategyMetrics(includeHistory = true): Promise<Strat
 }
 
 export async function fetchRussellMomentum(
-  timeframe: RussellTimeframe,
+  timeframe: MomentumTimeframe,
   limit = 50,
-): Promise<RussellMomentumResponse> {
+): Promise<MomentumResponse> {
   const params = new URLSearchParams({
     timeframe,
     limit: String(limit),
   });
   const response = await fetch(`${apiBase}/api/russell/momentum?${params.toString()}`);
-  return handleResponse<RussellMomentumResponse>(response);
+  return handleResponse<MomentumResponse>(response);
+}
+
+export async function fetchSpMomentum(
+  timeframe: MomentumTimeframe,
+  limit = 50,
+): Promise<MomentumResponse> {
+  const params = new URLSearchParams({
+    timeframe,
+    limit: String(limit),
+  });
+  const response = await fetch(`${apiBase}/api/sp500/momentum?${params.toString()}`);
+  return handleResponse<MomentumResponse>(response);
 }
 

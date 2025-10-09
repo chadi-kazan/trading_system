@@ -348,19 +348,20 @@ python main.py update-strategy-metrics --input data/strategy_metrics_sample.json
 
 Add `--dry-run` to preview without writing to the database. Each JSON object should include the strategy/regime identifiers, sample size, wins, and any computed fields (excess return, reliability_weight, correlation_penalty, extras, etc.). The new `/diagnostics/strategy-weights` page reflects the latest snapshots you ingest.
 
-## Russell 2000 Momentum Explorer
+## Momentum Explorer (Russell 2000 & S&P 500)
 
-Use the `/api/russell/momentum` endpoint or the dashboard route `/russell/momentum` to scan Russell 2000 constituents for strength and underperformance. Timeframe toggles (day, week, month, YTD) adjust the lookback window, and the limit selector controls how many symbols appear in each leaderboard. Every payload includes the Russell 2000 ETF baseline so you can benchmark moves.
+Use the `/api/russell/momentum` and `/api/sp500/momentum` endpoints - or the dashboard routes `/russell/momentum` and `/sp500/momentum` - to compare leadership across small-cap and large-cap universes. Timeframe toggles (day, week, month, YTD) adjust the lookback window, and the limit selector (50, 100, 150, 200) controls how many symbols appear per leaderboard. Each payload includes the relevant ETF baseline (IWM or SPY) so you can benchmark moves quickly.
 
-- `Top Risers` lists the best percentage movers in descending order.
-- `Underperformers` highlights the weakest names so you can flag breakdown risk or potential mean-reversion setups.
-- Each row lets you stage a preferred watchlist status, push the symbol into the shared watchlist, or jump straight into the main dashboard with the selection pre-loaded.
-- Volume columns show the raw print plus relative volume to help confirm participation.
+- `Top Risers` lists the strongest percentage movers in descending order; `Underperformers` surfaces the weakest names.
+- Click any column header (change %, final score, or individual strategy) to sort the table - strategy and aggregate scores are shown per row for fast triage.
+- Stage a preferred watchlist status, push the symbol into the shared watchlist, or open the main dashboard with the selection pre-loaded via the quick actions column.
+- Volume columns display the raw print plus relative volume to confirm participation.
 
 Example API usage:
 
 ```bash
-curl "http://localhost:8000/api/russell/momentum?timeframe=week&limit=25"
+curl "http://localhost:8000/api/russell/momentum?timeframe=week&limit=50"
+curl "http://localhost:8000/api/sp500/momentum?timeframe=week&limit=50"
 ```
 
 ## Next Steps
@@ -369,11 +370,11 @@ curl "http://localhost:8000/api/russell/momentum?timeframe=week&limit=25"
 3. **Enrich Seed Universe** - Incorporate Russell 2000 constituents or custom watchlists for broader discovery.
 4. **Extend Strategies** - Add new modules in `strategies/` and register them in `STRATEGY_FACTORIES` for inclusion in CLI workflows.
 5. **Enhance Notebooks** - Build custom dashboards atop the generated CSV outputs for investment committee presentations.
-6. **Russell 2000 Momentum Explorer** - Use the `/russell/momentum` page to triage leaders and laggards, then hand symbols off to the main dashboard or watchlist with one click.
+6. **Momentum Explorer** - Use the `/russell/momentum` and `/sp500/momentum` pages to compare leaders and laggards, sort by strategy or final scores, and push symbols to the dashboard or watchlist with one click.
 
 
 
-The system is intentionally modular—adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
+The system is intentionally modular - adjust a single component (e.g., filters, risk limits, analytics) without rewriting the CLI. Combine automated reports with discretionary review to maintain a disciplined, repeatable small-cap growth process.
 
 
 

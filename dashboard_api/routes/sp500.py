@@ -1,4 +1,4 @@
-"""API routes exposing Russell 2000 momentum snapshots."""
+"""API routes exposing S&P 500 momentum snapshots."""
 
 from __future__ import annotations
 
@@ -6,11 +6,11 @@ from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 
-from ..dependencies import get_russell_momentum_service
+from ..dependencies import get_sp_momentum_service
 from ..schemas import MomentumResponse
-from ..services import RussellMomentumService
+from ..services import SPMomentumService
 
-router = APIRouter(prefix="/russell", tags=["Russell"])
+router = APIRouter(prefix="/sp500", tags=["SP500"])
 
 TimeframeLiteral = Literal["day", "week", "month", "ytd"]
 
@@ -18,10 +18,10 @@ TimeframeLiteral = Literal["day", "week", "month", "ytd"]
 @router.get(
     "/momentum",
     response_model=MomentumResponse,
-    summary="Russell 2000 momentum leaderboard",
-    response_description="Top gainers and laggards within the Russell 2000 for the requested timeframe.",
+    summary="S&P 500 momentum leaderboard",
+    response_description="Top gainers and laggards within the S&P 500 for the requested timeframe.",
 )
-def get_russell_momentum(
+def get_sp500_momentum(
     timeframe: TimeframeLiteral = Query(
         "week",
         description="Performance window to evaluate (day, week, month, ytd).",
@@ -32,9 +32,9 @@ def get_russell_momentum(
         le=200,
         description="Maximum number of symbols to include per leaderboard section.",
     ),
-    service: RussellMomentumService = Depends(get_russell_momentum_service),
+    service: SPMomentumService = Depends(get_sp_momentum_service),
 ) -> MomentumResponse:
-    """Return Russell 2000 momentum data for dashboards."""
+    """Return S&P 500 momentum data for dashboards."""
     try:
         return service.get_momentum(timeframe=timeframe, limit=limit)
     except ValueError as exc:

@@ -5,7 +5,8 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date, datetime, timedelta
-from typing import Any, Dict, Iterable, List, Optional, Tuple
+from pathlib import Path
+from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
 
 import pandas as pd
 
@@ -15,25 +16,27 @@ from data_providers.base import PriceRequest
 from data_providers.yahoo import YahooPriceProvider
 from indicators.moving_average import ema
 from indicators.volatility import average_true_range
-from main import build_strategy_weight_map, instantiate_strategies
 from strategies.aggregation import AggregationParams, SignalAggregator
 from strategies.base import Strategy, StrategySignal
 from strategies.trend_following import TrendFollowingStrategy
 from trading_system.config_manager import TradingSystemConfig
-from universe.candidates import load_russell_2000_candidates
+from universe.candidates import load_russell_2000_candidates, load_sp500_candidates
+
+if TYPE_CHECKING:
+    from main import build_strategy_weight_map, instantiate_strategies
 
 from .config import get_config
 from .metadata import STRATEGY_METADATA, STRATEGY_ORDER
 from .schemas import (
     AggregatedSignalPayload,
+    MomentumEntry,
+    MomentumResponse,
     PriceBar,
     StrategyAnalysis,
     StrategyInfo,
     StrategySignalPayload,
     SymbolAnalysisResponse,
     SymbolSearchResult,
-    RussellMomentumEntry,
-    RussellMomentumResponse,
 )
 
 LOGGER = logging.getLogger(__name__)
@@ -47,6 +50,8 @@ class SignalService:
     """High-level orchestration for symbol analysis and search."""
 
     def __init__(self, config: TradingSystemConfig | None = None) -> None:
+        from main import build_strategy_weight_map, instantiate_strategies
+
         self.config = config or get_config()
         self.price_provider = YahooPriceProvider(
             cache_dir=self.config.storage.price_cache_dir,
@@ -92,6 +97,7 @@ class SignalService:
                     label=meta.get("label", name.replace("_", " ").title()),
                     description=meta.get("description", ""),
                     chart_type=meta.get("chart_type", "unknown"),
+                    investment_bounds=meta.get("investment_bounds"),
                 )
             )
         return items
@@ -183,7 +189,7 @@ class SignalService:
             LOGGER.warning("Fundamentals lookup failed for %s: %s", cleaned_symbol, exc)
 
         enriched = enrich_price_frame(cleaned_symbol, frame, fundamentals=fundamentals)
-        enriched = self._ensure_additional_indicators(enriched)
+        enriched = _ensure_additional_indicators(self._strategy_map, enriched)
 
         strategy_payloads: List[StrategyAnalysis] = []
         collected_signals: List[StrategySignal] = []
@@ -224,31 +230,6 @@ class SignalService:
     # ------------------------------------------------------------------
     # Internal helpers
     # ------------------------------------------------------------------
-    def _ensure_additional_indicators(self, frame: pd.DataFrame) -> pd.DataFrame:
-        if frame.empty:
-            return frame
-
-        enriched = frame.copy()
-        trend = self._strategy_map.get("trend_following")
-        if isinstance(trend, TrendFollowingStrategy):
-            params = trend.params
-            try:
-                enriched["fast_ema"] = ema(enriched["close"], span=params.fast_span)
-                enriched["slow_ema"] = ema(enriched["close"], span=params.slow_span)
-                enriched["atr"] = average_true_range(
-                    enriched["high"],
-                    enriched["low"],
-                    enriched["close"],
-                    period=params.atr_period,
-                )
-            except KeyError:
-                LOGGER.debug("Missing columns for EMA/ATR enrichment; skipping additional indicators")
-        else:
-            for column in ("fast_ema", "slow_ema", "atr"):
-                if column not in enriched.columns:
-                    enriched[column] = pd.NA
-        return enriched
-
     def _build_strategy_analysis(
         self,
         strategy: Strategy,
@@ -269,6 +250,7 @@ class SignalService:
             label=meta.get("label", strategy.name.replace("_", " ").title()),
             description=meta.get("description", ""),
             chart_type=meta.get("chart_type", "unknown"),
+            investment_bounds=meta.get("investment_bounds"),
             signals=signal_payloads,
             latest_metadata=latest_metadata,
             extras=extras,
@@ -336,10 +318,9 @@ class SignalService:
         )
 
 
-class RussellMomentumService:
-    """Compute Russell 2000 momentum snapshots for dashboard consumption."""
+class BaseMomentumService:
+    """Base implementation for computing index momentum leaderboards."""
 
-    BASELINE_SYMBOL = "IWM"
     MAX_LIMIT = 200
     CACHE_TTL_SECONDS = 300.0
     TIMEFRAME_CONFIG: Dict[str, Dict[str, Any]] = {
@@ -349,20 +330,43 @@ class RussellMomentumService:
         "ytd": {"window_days": 400, "reference_days": None},
     }
 
-    def __init__(self, config: TradingSystemConfig | None = None) -> None:
+    def __init__(
+        self,
+        *,
+        baseline_symbol: str,
+        symbol_loader: Callable[[], List[str]],
+        metadata_sources: Sequence[Path],
+        config: TradingSystemConfig | None = None,
+    ) -> None:
+        from main import build_strategy_weight_map, instantiate_strategies
+
         self.config = config or get_config()
+        self.baseline_symbol = baseline_symbol
+        self._symbol_loader = symbol_loader
+        self._metadata_sources = list(metadata_sources)
         self.price_provider = YahooPriceProvider(
             cache_dir=self.config.storage.price_cache_dir,
             cache_ttl_days=self.config.data_sources.cache_days,
         )
+        self._strategies: List[Strategy] = instantiate_strategies(None, self.config)
+        self._strategy_map: Dict[str, Strategy] = {strategy.name: strategy for strategy in self._strategies}
+
+        weights = build_strategy_weight_map(self.config)
+        self.aggregator = SignalAggregator(
+            AggregationParams(
+                min_confidence=0.5,
+                weighting=weights,
+            )
+        )
+
         self._symbols: Optional[List[str]] = None
         self._metadata: Optional[Dict[str, Dict[str, Optional[str]]]] = None
-        self._cache: Dict[Tuple[str, int], Tuple[float, RussellMomentumResponse]] = {}
+        self._cache: Dict[Tuple[str, int], Tuple[float, MomentumResponse]] = {}
 
     # ------------------------------------------------------------------
     # Public API
     # ------------------------------------------------------------------
-    def get_momentum(self, timeframe: str, *, limit: int = 50) -> RussellMomentumResponse:
+    def get_momentum(self, timeframe: str, *, limit: int = 50) -> MomentumResponse:
         tf = (timeframe or "").strip().lower()
         if tf not in self.TIMEFRAME_CONFIG:
             raise ValueError(f"Unsupported timeframe '{timeframe}'. Choose from day, week, month, ytd.")
@@ -377,12 +381,12 @@ class RussellMomentumService:
 
         symbols = self._load_symbols()
         if not symbols:
-            raise RuntimeError("No Russell 2000 symbols available for analysis")
+            raise RuntimeError("No symbols available for analysis")
 
         end_date = date.today()
         start_date = self._compute_start_date(end_date, tf)
 
-        entries: List[RussellMomentumEntry] = []
+        entries: List[MomentumEntry] = []
         skipped = 0
 
         for symbol in symbols:
@@ -393,7 +397,7 @@ class RussellMomentumService:
             entries.append(entry)
 
         if not entries:
-            raise RuntimeError("Failed to compute momentum for any Russell 2000 constituents")
+            raise RuntimeError("Failed to compute momentum for any symbols")
 
         entries.sort(key=lambda item: item.change_percent, reverse=True)
         top_gainers = entries[:capped_limit]
@@ -405,15 +409,15 @@ class RussellMomentumService:
         else:
             top_losers = losers_sorted[:capped_limit]
 
-        baseline_entry = next((entry for entry in entries if entry.symbol == self.BASELINE_SYMBOL), None)
+        baseline_entry = next((entry for entry in entries if entry.symbol == self.baseline_symbol), None)
 
-        response = RussellMomentumResponse(
+        response = MomentumResponse(
             timeframe=tf,
             generated_at=datetime.utcnow(),
             universe_size=len(symbols),
             evaluated_symbols=len(entries),
             skipped_symbols=skipped,
-            baseline_symbol=self.BASELINE_SYMBOL if baseline_entry else None,
+            baseline_symbol=self.baseline_symbol if baseline_entry else None,
             baseline_change_percent=baseline_entry.change_percent if baseline_entry else None,
             baseline_last_price=baseline_entry.last_price if baseline_entry else None,
             top_gainers=top_gainers,
@@ -428,8 +432,8 @@ class RussellMomentumService:
     # ------------------------------------------------------------------
     def _load_symbols(self) -> List[str]:
         if self._symbols is None:
-            symbols = load_russell_2000_candidates()
-            self._symbols = [symbol for symbol in symbols if symbol]
+            symbols = self._symbol_loader()
+            self._symbols = [symbol.strip().upper() for symbol in symbols if symbol]
         return self._symbols
 
     def _load_metadata(self) -> Dict[str, Dict[str, Optional[str]]]:
@@ -437,13 +441,7 @@ class RussellMomentumService:
             return self._metadata
 
         metadata: Dict[str, Dict[str, Optional[str]]] = {}
-        universe_dir = self.config.storage.universe_dir
-        sources = [
-            universe_dir / "seed_candidates.csv",
-            universe_dir / "yahoo_small_caps.csv",
-            universe_dir / "russell_2000.csv",
-        ]
-        for path in sources:
+        for path in self._metadata_sources:
             if not path.exists():
                 continue
             try:
@@ -478,7 +476,7 @@ class RussellMomentumService:
         start_date: date,
         end_date: date,
         timeframe: str,
-    ) -> Optional[RussellMomentumEntry]:
+    ) -> Optional[MomentumEntry]:
         try:
             result = self.price_provider.get_price_history(
                 PriceRequest(symbol=symbol, start=start_date, end=end_date, interval="1d")
@@ -494,6 +492,9 @@ class RussellMomentumService:
         reference_price = self._select_reference_price(frame, timeframe)
         if reference_price is None or reference_price <= 0:
             return None
+
+        enriched = self._prepare_enriched_frame(symbol, frame)
+        strategy_scores, final_score = self._score_symbol(symbol, enriched)
 
         latest_row = frame.iloc[-1]
         last_close = _safe_float(latest_row.get("close"))
@@ -511,7 +512,7 @@ class RussellMomentumService:
 
         metadata = self._load_metadata().get(symbol, {})
 
-        return RussellMomentumEntry(
+        return MomentumEntry(
             symbol=symbol,
             name=metadata.get("name") or symbol,
             sector=metadata.get("sector"),
@@ -524,7 +525,47 @@ class RussellMomentumService:
             average_volume=average_volume,
             relative_volume=relative_volume,
             data_points=len(frame.index),
+            strategy_scores=strategy_scores,
+            final_score=final_score,
         )
+
+    def _prepare_enriched_frame(self, symbol: str, frame: pd.DataFrame) -> pd.DataFrame:
+        fundamentals: Dict[str, Any] = {}
+        try:
+            fundamentals = load_fundamental_metrics(
+                symbol,
+                base_dir=self.config.storage.universe_dir,
+                api_key=self.config.data_sources.alpha_vantage_key,
+            )
+        except Exception as exc:  # pragma: no cover - defensive logging
+            LOGGER.debug("Fundamentals lookup failed for %s: %s", symbol, exc)
+
+        enriched = enrich_price_frame(symbol, frame, fundamentals=fundamentals)
+        return _ensure_additional_indicators(self._strategy_map, enriched)
+
+    def _score_symbol(self, symbol: str, enriched: pd.DataFrame) -> Tuple[Dict[str, float], Optional[float]]:
+        scores: Dict[str, float] = {}
+        collected: List[StrategySignal] = []
+
+        for name in STRATEGY_ORDER:
+            strategy = self._strategy_map.get(name)
+            if strategy is None:
+                continue
+            try:
+                signals = strategy.generate_signals(symbol, enriched)
+            except Exception as exc:  # pragma: no cover - defensive logging
+                LOGGER.debug("Strategy %s failed for %s: %s", name, symbol, exc)
+                signals = []
+            if signals:
+                latest_signal = signals[-1]
+                scores[name] = float(latest_signal.confidence)
+                collected.extend(signals)
+            else:
+                scores[name] = 0.0
+
+        aggregated = list(self.aggregator.aggregate(collected))
+        final_score = float(aggregated[-1].confidence) if aggregated else None
+        return scores, final_score
 
     def _select_reference_price(self, frame: pd.DataFrame, timeframe: str) -> Optional[float]:
         if frame.empty:
@@ -562,6 +603,41 @@ class RussellMomentumService:
                 return None
             subset = frame.iloc[[0]]
         return _safe_float(subset.iloc[-1].get("close"))
+
+
+class RussellMomentumService(BaseMomentumService):
+    """Momentum metrics for Russell 2000 constituents."""
+
+    def __init__(self, config: TradingSystemConfig | None = None) -> None:
+        config_obj = config or get_config()
+        universe_dir = config_obj.storage.universe_dir
+        super().__init__(
+            baseline_symbol="IWM",
+            symbol_loader=load_russell_2000_candidates,
+            metadata_sources=[
+                universe_dir / "seed_candidates.csv",
+                universe_dir / "yahoo_small_caps.csv",
+                universe_dir / "russell_2000.csv",
+            ],
+            config=config_obj,
+        )
+
+
+class SPMomentumService(BaseMomentumService):
+    """Momentum metrics for S&P 500 constituents."""
+
+    def __init__(self, config: TradingSystemConfig | None = None) -> None:
+        config_obj = config or get_config()
+        universe_dir = config_obj.storage.universe_dir
+        super().__init__(
+            baseline_symbol="SPY",
+            symbol_loader=load_sp500_candidates,
+            metadata_sources=[
+                universe_dir / "seed_candidates.csv",
+                universe_dir / "sp500.csv",
+            ],
+            config=config_obj,
+        )
 
 
 # ----------------------------------------------------------------------
@@ -621,6 +697,32 @@ def _normalise_metadata(metadata: Dict[str, Any]) -> Dict[str, Any]:
     return normalised
 
 
-__all__ = ["SignalService", "RussellMomentumService", "RateLimitError"]
+def _ensure_additional_indicators(strategy_map: Dict[str, Strategy], frame: pd.DataFrame) -> pd.DataFrame:
+    if frame.empty:
+        return frame
+
+    enriched = frame.copy()
+    trend = strategy_map.get("trend_following")
+    if isinstance(trend, TrendFollowingStrategy):
+        params = trend.params
+        try:
+            enriched["fast_ema"] = ema(enriched["close"], span=params.fast_span)
+            enriched["slow_ema"] = ema(enriched["close"], span=params.slow_span)
+            enriched["atr"] = average_true_range(
+                enriched["high"],
+                enriched["low"],
+                enriched["close"],
+                period=params.atr_period,
+            )
+        except KeyError:
+            LOGGER.debug("Missing columns for EMA/ATR enrichment; skipping additional indicators")
+    else:
+        for column in ("fast_ema", "slow_ema", "atr"):
+            if column not in enriched.columns:
+                enriched[column] = pd.NA
+    return enriched
+
+
+__all__ = ["SignalService", "RussellMomentumService", "SPMomentumService", "RateLimitError"]
 
 

@@ -18,6 +18,7 @@ class StrategyInfo(BaseModel):
     label: str
     description: str
     chart_type: str
+    investment_bounds: Optional[str] = None
 
 
 class StrategySignalPayload(BaseModel):
@@ -32,6 +33,7 @@ class StrategyAnalysis(BaseModel):
     label: str
     description: str
     chart_type: str
+    investment_bounds: Optional[str] = None
     signals: List[StrategySignalPayload] = Field(default_factory=list)
     latest_metadata: Optional[Dict[str, Any]] = None
     extras: Dict[str, Any] = Field(default_factory=dict)
@@ -89,7 +91,7 @@ class SearchResponse(BaseModel):
     results: List[SymbolSearchResult]
 
 
-class RussellMomentumEntry(BaseModel):
+class MomentumEntry(BaseModel):
     symbol: str
     name: Optional[str] = None
     sector: Optional[str] = None
@@ -102,9 +104,11 @@ class RussellMomentumEntry(BaseModel):
     average_volume: Optional[float] = None
     relative_volume: Optional[float] = None
     data_points: int
+    strategy_scores: Dict[str, float] = Field(default_factory=dict)
+    final_score: Optional[float] = None
 
 
-class RussellMomentumResponse(BaseModel):
+class MomentumResponse(BaseModel):
     timeframe: str
     generated_at: datetime
     universe_size: int
@@ -113,8 +117,8 @@ class RussellMomentumResponse(BaseModel):
     baseline_symbol: Optional[str] = None
     baseline_change_percent: Optional[float] = None
     baseline_last_price: Optional[float] = None
-    top_gainers: List[RussellMomentumEntry] = Field(default_factory=list)
-    top_losers: List[RussellMomentumEntry] = Field(default_factory=list)
+    top_gainers: List[MomentumEntry] = Field(default_factory=list)
+    top_losers: List[MomentumEntry] = Field(default_factory=list)
 
 
 __all__ = [
@@ -125,8 +129,8 @@ __all__ = [
     "StrategyAnalysis",
     "StrategyInfo",
     "StrategySignalPayload",
-    "RussellMomentumEntry",
-    "RussellMomentumResponse",
+    "MomentumEntry",
+    "MomentumResponse",
     "SymbolAnalysisResponse",
     "SymbolSearchResult",
 ]

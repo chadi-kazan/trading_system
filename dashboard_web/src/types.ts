@@ -3,6 +3,7 @@ export type StrategyInfo = {
   label: string;
   description: string;
   chart_type: string;
+  investment_bounds?: string | null;
 };
 
 export type StrategySignal = {
@@ -17,6 +18,7 @@ export type StrategyAnalysis = {
   label: string;
   description: string;
   chart_type: string;
+  investment_bounds?: string | null;
   signals: StrategySignal[];
   latest_metadata?: Record<string, unknown> | null;
   extras: Record<string, unknown>;
@@ -131,9 +133,9 @@ export type StrategyMetricSummary = {
   history: StrategyMetricHistory[];
 };
 
-export type RussellTimeframe = "day" | "week" | "month" | "ytd";
+export type MomentumTimeframe = "day" | "week" | "month" | "ytd";
 
-export type RussellMomentumEntry = {
+export type MomentumEntry = {
   symbol: string;
   name?: string | null;
   sector?: string | null;
@@ -146,10 +148,12 @@ export type RussellMomentumEntry = {
   average_volume?: number | null;
   relative_volume?: number | null;
   data_points: number;
+  strategy_scores: Record<string, number>;
+  final_score?: number | null;
 };
 
-export type RussellMomentumResponse = {
-  timeframe: RussellTimeframe;
+export type MomentumResponse = {
+  timeframe: MomentumTimeframe;
   generated_at: string;
   universe_size: number;
   evaluated_symbols: number;
@@ -157,7 +161,7 @@ export type RussellMomentumResponse = {
   baseline_symbol?: string | null;
   baseline_change_percent?: number | null;
   baseline_last_price?: number | null;
-  top_gainers: RussellMomentumEntry[];
-  top_losers: RussellMomentumEntry[];
+  top_gainers: MomentumEntry[];
+  top_losers: MomentumEntry[];
 };
 

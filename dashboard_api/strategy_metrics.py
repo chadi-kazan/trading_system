@@ -19,6 +19,12 @@ DB_PATH = Path(os.getenv("STRATEGY_METRICS_DB_PATH", DATA_DIR / "strategy_metric
 
 engine = create_engine(f"sqlite:///{DB_PATH}", echo=False, future=True)
 
+_TABLE_NAMES = ("strategy", "marketregime", "strategyregimesnapshot", "strategymetrichistory")
+for _table_name in _TABLE_NAMES:
+    table = SQLModel.metadata.tables.get(_table_name)
+    if table is not None:
+        SQLModel.metadata.remove(table)
+
 
 class Strategy(SQLModel, table=True):
     """Reference metadata for a trading strategy."""

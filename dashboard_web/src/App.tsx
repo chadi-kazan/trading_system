@@ -13,6 +13,7 @@ import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
 import { StrategyWeightsPage } from "./pages/StrategyWeightsPage";
 import { RussellMomentumPage } from "./pages/RussellMomentumPage";
+import { SPMomentumPage } from "./pages/SPMomentumPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
@@ -319,6 +320,7 @@ const navLinks = [
   { label: "Dashboard", to: "/" },
   { label: "Signal Guides", to: "/guides/signals" },
   { label: "Russell Momentum", to: "/russell/momentum" },
+  { label: "S&P Momentum", to: "/sp500/momentum" },
   { label: "Glossary", to: "/guides/glossary" },
   { label: "Watchlist", to: "/watchlist" },
   { label: "Strategy Health", to: "/diagnostics/strategy-weights" },
@@ -387,6 +389,15 @@ function AppLayout({
           path="/russell/momentum"
           element={
             <RussellMomentumPage
+              watchlistItems={watchlistItems}
+              onSaveWatchlist={handleQuickWatchlist}
+            />
+          }
+        />
+        <Route
+          path="/sp500/momentum"
+          element={
+            <SPMomentumPage
               watchlistItems={watchlistItems}
               onSaveWatchlist={handleQuickWatchlist}
             />

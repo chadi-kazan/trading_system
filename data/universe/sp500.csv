@@ -1,0 +1,28 @@
+symbol,name,sector
+AAPL,Apple Inc.,Technology
+MSFT,Microsoft Corporation,Technology
+GOOGL,Alphabet Inc. Class A,Communication Services
+AMZN,Amazon.com Inc.,Consumer Cyclical
+META,Meta Platforms Inc. Class A,Communication Services
+NVDA,NVIDIA Corporation,Technology
+TSLA,Tesla Inc.,Consumer Cyclical
+JPM,JP Morgan Chase & Co.,Financial Services
+V,Visa Inc. Class A,Financial Services
+MA,Mastercard Incorporated Class A,Financial Services
+HD,Home Depot Inc.,Consumer Cyclical
+UNH,UnitedHealth Group Incorporated,Healthcare
+BAC,Bank of America Corporation,Financial Services
+PG,Procter & Gamble Company,Consumer Defensive
+XOM,Exxon Mobil Corporation,Energy
+KO,Coca-Cola Company,Consumer Defensive
+DIS,Walt Disney Company,Communication Services
+PEP,PepsiCo Inc.,Consumer Defensive
+INTC,Intel Corporation,Technology
+CSCO,Cisco Systems Inc.,Technology
+NFLX,Netflix Inc.,Communication Services
+CRM,Salesforce Inc.,Technology
+ORCL,Oracle Corporation,Technology
+COST,Costco Wholesale Corporation,Consumer Defensive
+T,AT&T Inc.,Communication Services
+IBM,International Business Machines Corporation,Technology
+WMT,Walmart Inc.,Consumer Defensive

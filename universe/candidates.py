@@ -42,6 +42,7 @@ DEFAULT_CANDIDATES = [
 
 DEFAULT_PATH = Path("data/universe/seed_candidates.csv")
 RUSSELL_2000_PATH = Path("data/universe/russell_2000.csv")
+SP500_PATH = Path("data/universe/sp500.csv")
 
 
 def _normalise(symbols: Iterable[str]) -> List[str]:
@@ -105,10 +106,17 @@ def load_russell_2000_candidates() -> List[str]:
     return _load_symbols_from_file(RUSSELL_2000_PATH)
 
 
+def load_sp500_candidates() -> List[str]:
+    """Convenience helper that returns tickers from the S&P 500 CSV."""
+    return _load_symbols_from_file(SP500_PATH)
+
+
 __all__ = [
     "load_seed_candidates",
     "load_russell_2000_candidates",
+    "load_sp500_candidates",
     "DEFAULT_CANDIDATES",
     "DEFAULT_PATH",
     "RUSSELL_2000_PATH",
+    "SP500_PATH",
 ]
