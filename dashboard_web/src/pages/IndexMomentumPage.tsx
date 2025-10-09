@@ -1,7 +1,8 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchStrategies } from "../api";
+import { formatDisplayDate } from "../utils/date";
 import type {
   MomentumEntry,
   MomentumResponse,
@@ -52,22 +53,14 @@ function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
     return "—";
   }
-  if (value >= 1_000_000_000) {
-    return `${(value / 1_000_000_000).toFixed(2)}B`;
-  }
-  if (value >= 1_000_000) {
-    return `${(value / 1_000_000).toFixed(2)}M`;
-  }
-  if (value >= 1_000) {
-    return `${(value / 1_000).toFixed(1)}K`;
-  }
+  if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
+  if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
+  if (value >= 1_000) return `${(value / 1_000).toFixed(1)}K`;
   return value.toLocaleString();
 }
 
 function getRankClass(changePercent: number): string {
-  if (Number.isNaN(changePercent)) {
-    return "";
-  }
+  if (Number.isNaN(changePercent)) return "";
   if (changePercent >= 15) return "bg-emerald-500/10 text-emerald-600";
   if (changePercent >= 5) return "bg-emerald-400/10 text-emerald-500";
   if (changePercent <= -10) return "bg-rose-500/10 text-rose-600";
@@ -75,7 +68,7 @@ function getRankClass(changePercent: number): string {
   return "bg-slate-200 text-slate-600";
 }
 
-const viewOptions: Array<{ label: string; value: LeaderboardView; description: string }> = [
+const VIEW_OPTIONS: Array<{ label: string; value: LeaderboardView; description: string }> = [
   { label: "Top Risers", value: "gainers", description: "Strongest percentage moves over the selected window." },
   { label: "Underperformers", value: "laggards", description: "Weakest percentage moves over the selected window." },
 ];
@@ -141,17 +134,13 @@ export function IndexMomentumPage({
   }, [fetchMomentum, timeframe, limit, refreshToken]);
 
   useEffect(() => {
-    if (sortKey !== "change_percent") {
-      return;
-    }
+    if (sortKey !== "change_percent") return;
     setSortDirection(view === "laggards" ? "asc" : "desc");
   }, [view, sortKey]);
 
   const watchlistMap = useMemo(() => {
     const map = new Map<string, SavedSignal>();
-    watchlistItems.forEach((item) => {
-      map.set(item.symbol.toUpperCase(), item);
-    });
+    watchlistItems.forEach((item) => map.set(item.symbol.toUpperCase(), item));
     return map;
   }, [watchlistItems]);
 
@@ -159,12 +148,12 @@ export function IndexMomentumPage({
     if (strategies.length > 0) {
       return strategies;
     }
-    const sampleEntry =
+    const sample =
       data && data.top_gainers.length > 0 ? data.top_gainers[0] : data && data.top_losers.length > 0 ? data.top_losers[0] : null;
-    if (!sampleEntry) {
-      return [];
+    if (!sample) {
+      return [] as StrategyInfo[];
     }
-    return Object.keys(sampleEntry.strategy_scores || {}).map((name) => ({
+    return Object.keys(sample.strategy_scores ?? {}).map((name) => ({
       name,
       label: name.replace(/_/g, " ").replace(/\b\w/g, (ch) => ch.toUpperCase()),
       description: "",
@@ -173,10 +162,20 @@ export function IndexMomentumPage({
     }));
   }, [strategies, data]);
 
+  const sortOptions = useMemo(
+    (): Array<{ value: SortKey; label: string }> => [
+      { value: "change_percent", label: "Change %" },
+      { value: "final_score", label: "Final Score" },
+      ...availableStrategies.map((strategy) => ({
+        value: `strategy:${strategy.name}` as SortKey,
+        label: strategy.label,
+      })),
+    ],
+    [availableStrategies],
+  );
+
   const entries = useMemo(() => {
-    if (!data) {
-      return [] as MomentumEntry[];
-    }
+    if (!data) return [] as MomentumEntry[];
     const raw = view === "gainers" ? data.top_gainers : data.top_losers;
     const copy = [...raw];
     const valueForEntry = (entry: MomentumEntry): number => {
@@ -193,13 +192,10 @@ export function IndexMomentumPage({
       const aValue = valueForEntry(a);
       const bValue = valueForEntry(b);
       if (aValue === bValue) return 0;
-      if (sortDirection === "desc") {
-        return bValue - aValue;
-      }
-      return aValue - bValue;
+      return sortDirection === "desc" ? bValue - aValue : aValue - bValue;
     });
     return copy;
-  }, [data, sortKey, sortDirection, view]);
+  }, [data, view, sortKey, sortDirection]);
 
   const baselineSummary = useMemo(() => {
     if (!data || !data.baseline_symbol) {
@@ -250,6 +246,16 @@ export function IndexMomentumPage({
     navigate("/", { state: { symbol: symbol.toUpperCase(), status } });
   };
 
+  const handleSortSelectChange = (event: ChangeEvent<HTMLSelectElement>) => {
+    const key = event.target.value as SortKey;
+    setSortKey(key);
+    setSortDirection(key === "change_percent" && view === "laggards" ? "asc" : "desc");
+  };
+
+  const toggleSortDirection = () => {
+    setSortDirection((prev) => (prev === "desc" ? "asc" : "desc"));
+  };
+
   const handleSort = (key: SortKey) => {
     setSortKey((prevKey) => {
       if (prevKey === key) {
@@ -263,22 +269,20 @@ export function IndexMomentumPage({
 
   const renderSortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return (
-      <span className="ml-1 text-xs text-slate-400">
-        {sortDirection === "desc" ? "▼" : "▲"}
-      </span>
-    );
+    return <span className="ml-1 text-xs text-slate-400">{sortDirection === "desc" ? "▼" : "▲"}</span>;
   };
 
   const watchlistMapHas = (symbol: string) => watchlistMap.has(symbol.toUpperCase());
+  const sortDirectionLabel = sortDirection === "desc" ? "descending" : "ascending";
+  const sortDirectionButtonLabel = sortDirection === "desc" ? "Desc ▼" : "Asc ▲";
 
   return (
-    <div className="mx-auto flex w-full max-w-7xl flex-col gap-8 px-6 py-10">
+    <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
       <header className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
         <div className="space-y-2">
           <p className="text-sm font-semibold uppercase tracking-wide text-blue-500">{indexKey}</p>
           <h2 className="text-3xl font-semibold text-slate-900 sm:text-4xl">{title}</h2>
-          <p className="max-w-2xl text-sm text-slate-600">{description}</p>
+          <p className="max-w-3xl text-sm text-slate-600">{description}</p>
         </div>
         <div className="flex items-center gap-3">
           <button
@@ -292,7 +296,7 @@ export function IndexMomentumPage({
       </header>
 
       <section className="grid gap-4 rounded-xl bg-white p-6 shadow-sm shadow-slate-200">
-        <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex flex-col gap-4 xl:flex-row xl:items-center xl:justify-between">
           <div className="flex flex-wrap gap-2">
             {TIMEFRAME_OPTIONS.map((option) => (
               <button
@@ -332,17 +336,38 @@ export function IndexMomentumPage({
               </span>
             ) : null}
           </div>
+          <div className="flex flex-wrap items-center gap-3 text-sm text-slate-500">
+            <label htmlFor={`${indexKey}-sort-select`} className="font-medium text-slate-600">
+              Sort By
+            </label>
+            <select
+              id={`${indexKey}-sort-select`}
+              value={sortKey}
+              onChange={handleSortSelectChange}
+              className="rounded-md border border-slate-200 bg-white px-3 py-2 text-sm shadow-sm focus:border-blue-400 focus:outline-none focus:ring-2 focus:ring-blue-200"
+            >
+              {sortOptions.map((option) => (
+                <option key={option.value} value={option.value}>
+                  {option.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={toggleSortDirection}
+              className="inline-flex items-center rounded-md border border-slate-200 bg-white px-3 py-2 text-sm font-medium text-slate-600 shadow-sm transition hover:border-blue-300 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-200"
+              title={`Toggle sort direction (currently ${sortDirectionLabel})`}
+            >
+              {sortDirectionButtonLabel}
+            </button>
+          </div>
         </div>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <SummaryTile label="Universe Size" value={data?.universe_size} suffix="symbols" />
           <SummaryTile label="Evaluated" value={data?.evaluated_symbols} suffix="symbols" />
           <SummaryTile label="Skipped" value={data?.skipped_symbols} suffix="symbols" />
-          <SummaryTile
-            label="Generated"
-            value={data ? new Date(data.generated_at).toLocaleString() : "—"}
-            isString
-          />
+          <SummaryTile label="Generated" value={data ? formatDisplayDate(data.generated_at) : "—"} isString />
         </div>
       </section>
 
@@ -353,11 +378,11 @@ export function IndexMomentumPage({
               {view === "gainers" ? "Top Risers" : "Underperformers"}
             </h3>
             <p className="text-sm text-slate-500">
-              {viewOptions.find((option) => option.value === view)?.description ?? ""}
+              {VIEW_OPTIONS.find((option) => option.value === view)?.description ?? ""}
             </p>
           </div>
           <div className="flex gap-2">
-            {viewOptions.map((option) => (
+            {VIEW_OPTIONS.map((option) => (
               <button
                 key={option.value}
                 type="button"
@@ -379,16 +404,14 @@ export function IndexMomentumPage({
             <p className="text-sm text-slate-500">Loading momentum data...</p>
           </div>
         ) : error ? (
-          <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">
-            {error}
-          </div>
+          <div className="rounded-md border border-rose-200 bg-rose-50 px-4 py-3 text-sm text-rose-600">{error}</div>
         ) : entries.length === 0 ? (
           <div className="flex h-40 items-center justify-center">
             <p className="text-sm text-slate-500">No symbols matched the selected filters.</p>
           </div>
         ) : (
           <div className="overflow-x-auto">
-            <table className="min-w-full divide-y divide-slate-200 text-sm">
+            <table className="min-w-[1200px] divide-y divide-slate-200 text-sm">
               <thead>
                 <tr className="text-left text-xs uppercase tracking-wide text-slate-500">
                   <th className="py-3 pr-4">Rank</th>
@@ -511,25 +534,20 @@ function TableRow({
   strategies,
 }: TableRowProps): JSX.Element {
   const changeClass =
-    entry.change_percent > 0
-      ? "text-emerald-600"
-      : entry.change_percent < 0
-        ? "text-rose-600"
-        : "text-slate-600";
+    entry.change_percent > 0 ? "text-emerald-600" : entry.change_percent < 0 ? "text-rose-600" : "text-slate-600";
   const relativeVolume = entry.relative_volume ?? null;
-  const lastUpdated = new Date(entry.updated_at);
+  const lastUpdatedDate = new Date(entry.updated_at);
+  const formattedUpdated = Number.isNaN(lastUpdatedDate.getTime()) ? "—" : formatDisplayDate(lastUpdatedDate);
   const feedbackClass =
-    feedback?.type === "success"
-      ? "text-emerald-600"
-      : feedback?.type === "error"
-        ? "text-rose-600"
-        : "text-slate-500";
+    feedback?.type === "success" ? "text-emerald-600" : feedback?.type === "error" ? "text-rose-600" : "text-slate-500";
 
   return (
     <tr className="align-middle">
       <td className="whitespace-nowrap py-3 pr-4">
         <span
-          className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${getRankClass(entry.change_percent)}`}
+          className={`inline-flex h-8 w-8 items-center justify-center rounded-full text-xs font-semibold ${getRankClass(
+            entry.change_percent,
+          )}`}
         >
           {index + 1}
         </span>
@@ -539,9 +557,7 @@ function TableRow({
         {entry.name ?? "—"}
       </td>
       <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{entry.sector ?? "—"}</td>
-      <td className="whitespace-nowrap py-3 pr-4 text-right font-medium text-slate-900">
-        {formatCurrency(entry.last_price)}
-      </td>
+      <td className="whitespace-nowrap py-3 pr-4 text-right font-medium text-slate-900">{formatCurrency(entry.last_price)}</td>
       <td className={`whitespace-nowrap py-3 pr-4 text-right font-semibold ${changeClass}`}>
         {formatPercent(entry.change_percent)}
       </td>
@@ -558,9 +574,7 @@ function TableRow({
         ) : null}
       </td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{entry.data_points}</td>
-      <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-400">
-        {Number.isNaN(lastUpdated.getTime()) ? "—" : lastUpdated.toLocaleDateString()}
-      </td>
+      <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-400">{formattedUpdated}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right font-semibold text-slate-900">
         {entry.final_score !== null && entry.final_score !== undefined ? formatPercent(entry.final_score * 100, 1) : "—"}
       </td>
