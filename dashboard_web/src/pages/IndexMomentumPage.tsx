@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+﻿import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchStrategies } from "../api";
@@ -36,7 +36,7 @@ type IndexMomentumPageProps = {
 
 function formatPercent(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
+    return "â€”";
   }
   const rounded = Number.parseFloat(value.toFixed(digits));
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}%`;
@@ -44,14 +44,14 @@ function formatPercent(value: number | null | undefined, digits = 2): string {
 
 function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
+    return "â€”";
   }
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
+    return "â€”";
   }
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
@@ -269,12 +269,12 @@ export function IndexMomentumPage({
 
   const renderSortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return <span className="ml-1 text-xs text-slate-400">{sortDirection === "desc" ? "▼" : "▲"}</span>;
+    return <span className="ml-1 text-xs text-slate-400">{sortDirection === "desc" ? "â–¼" : "â–²"}</span>;
   };
 
   const watchlistMapHas = (symbol: string) => watchlistMap.has(symbol.toUpperCase());
   const sortDirectionLabel = sortDirection === "desc" ? "descending" : "ascending";
-  const sortDirectionButtonLabel = sortDirection === "desc" ? "Desc ▼" : "Asc ▲";
+  const sortDirectionButtonLabel = sortDirection === "desc" ? "Desc â–¼" : "Asc â–²";
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
@@ -367,7 +367,7 @@ export function IndexMomentumPage({
           <SummaryTile label="Universe Size" value={data?.universe_size} suffix="symbols" />
           <SummaryTile label="Evaluated" value={data?.evaluated_symbols} suffix="symbols" />
           <SummaryTile label="Skipped" value={data?.skipped_symbols} suffix="symbols" />
-          <SummaryTile label="Generated" value={data ? formatDisplayDate(data.generated_at) : "—"} isString />
+          <SummaryTile label="Generated" value={data ? formatDisplayDate(data.generated_at) : "â€”"} isString />
         </div>
       </section>
 
@@ -492,7 +492,7 @@ function SummaryTile({
 }) {
   const display =
     value === null || value === undefined
-      ? "—"
+      ? "â€”"
       : isString
         ? String(value)
         : Number.isFinite(value)
@@ -537,7 +537,7 @@ function TableRow({
     entry.change_percent > 0 ? "text-emerald-600" : entry.change_percent < 0 ? "text-rose-600" : "text-slate-600";
   const relativeVolume = entry.relative_volume ?? null;
   const lastUpdatedDate = new Date(entry.updated_at);
-  const formattedUpdated = Number.isNaN(lastUpdatedDate.getTime()) ? "—" : formatDisplayDate(lastUpdatedDate);
+  const formattedUpdated = Number.isNaN(lastUpdatedDate.getTime()) ? "â€”" : formatDisplayDate(lastUpdatedDate);
   const feedbackClass =
     feedback?.type === "success" ? "text-emerald-600" : feedback?.type === "error" ? "text-rose-600" : "text-slate-500";
 
@@ -554,9 +554,9 @@ function TableRow({
       </td>
       <td className="whitespace-nowrap py-3 pr-4 font-semibold text-slate-900">{entry.symbol}</td>
       <td className="max-w-xs truncate py-3 pr-4 text-slate-600" title={entry.name ?? undefined}>
-        {entry.name ?? "—"}
+        {entry.name ?? "â€”"}
       </td>
-      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{entry.sector ?? "—"}</td>
+      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{entry.sector ?? "â€”"}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right font-medium text-slate-900">{formatCurrency(entry.last_price)}</td>
       <td className={`whitespace-nowrap py-3 pr-4 text-right font-semibold ${changeClass}`}>
         {formatPercent(entry.change_percent)}
@@ -566,7 +566,7 @@ function TableRow({
       </td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{formatNumber(entry.volume ?? null)}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">
-        {relativeVolume ? relativeVolume.toFixed(2) : "—"}
+        {relativeVolume ? relativeVolume.toFixed(2) : "â€”"}
         {relativeVolume && relativeVolume > 1.5 ? (
           <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
             Elevated
@@ -576,7 +576,7 @@ function TableRow({
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{entry.data_points}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-400">{formattedUpdated}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right font-semibold text-slate-900">
-        {entry.final_score !== null && entry.final_score !== undefined ? formatPercent(entry.final_score * 100, 1) : "—"}
+        {entry.final_score !== null && entry.final_score !== undefined ? formatPercent(entry.final_score * 100, 1) : "â€”"}
       </td>
       {strategies.map((strategy) => {
         const rawScore = entry.strategy_scores?.[strategy.name] ?? 0;
@@ -600,7 +600,7 @@ function TableRow({
             ))}
           </select>
           {isTracked ? (
-            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-emerald-600">
+            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-100 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-emerald-600">
               Tracked
             </span>
           ) : null}
@@ -618,7 +618,7 @@ function TableRow({
                 : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600"
             }`}
           >
-            {isSaving ? "Saving…" : `${isTracked ? "Update" : "Add"} Watchlist`}
+            {isSaving ? "Savingâ€¦" : `${isTracked ? "Update" : "Add"} Watchlist`}
           </button>
           <button
             type="button"
@@ -635,3 +635,5 @@ function TableRow({
 }
 
 export default IndexMomentumPage;
+
+
