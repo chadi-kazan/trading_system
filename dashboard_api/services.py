@@ -98,6 +98,7 @@ class SignalService:
                     description=meta.get("description", ""),
                     chart_type=meta.get("chart_type", "unknown"),
                     investment_bounds=meta.get("investment_bounds"),
+                    score_guidance=meta.get("score_guidance"),
                 )
             )
         return items
@@ -251,6 +252,7 @@ class SignalService:
             description=meta.get("description", ""),
             chart_type=meta.get("chart_type", "unknown"),
             investment_bounds=meta.get("investment_bounds"),
+            score_guidance=meta.get("score_guidance"),
             signals=signal_payloads,
             latest_metadata=latest_metadata,
             extras=extras,

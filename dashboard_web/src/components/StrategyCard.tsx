@@ -1,4 +1,4 @@
-import {
+﻿import {
   Area,
   AreaChart,
   CartesianGrid,
@@ -8,12 +8,13 @@ import {
   Radar,
   RadarChart,
   ResponsiveContainer,
-  Tooltip,
+  Tooltip as RechartsTooltip,
   XAxis,
   YAxis,
 } from "recharts";
 import type { StrategyAnalysis } from "../types";
 import { formatDisplayDate } from "../utils/date";
+import { Tooltip, InfoIcon } from "./Tooltip";
 
 interface StrategyCardProps {
   strategy: StrategyAnalysis;
@@ -110,7 +111,7 @@ function renderConfidenceChart(strategy: StrategyAnalysis) {
         <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />
         <XAxis dataKey="date" tick={{ fontSize: 11 }} minTickGap={24} />
         <YAxis domain={[0, 1]} tick={{ fontSize: 11 }} width={36} />
-        <Tooltip formatter={tooltipFormatter} />
+        <RechartsTooltip formatter={tooltipFormatter} />
         <Area
           type="monotone"
           dataKey="confidence"
@@ -123,6 +124,7 @@ function renderConfidenceChart(strategy: StrategyAnalysis) {
     </ResponsiveContainer>
   );
 }
+
 
 function renderMetadata(strategy: StrategyAnalysis) {
   if (!strategy.latest_metadata) return null;
@@ -155,26 +157,54 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
     neutral: "bg-slate-100 text-slate-700 border border-slate-200",
     warning: "bg-amber-50 text-amber-700 border border-amber-200",
   };
-  const tooltipLines = [
-    strategy.description,
-    strategy.investment_bounds ? `Investment criteria: ${strategy.investment_bounds}` : null,
-  ].filter(Boolean);
-  const tooltipText = tooltipLines.join("\n");
+  const latestSignal = strategy.signals.at(-1);
+  const latestConfidence = typeof latestSignal?.confidence === "number" ? latestSignal.confidence : null;
+  const latestConfidencePercent = latestConfidence !== null ? Math.round(latestConfidence * 100) : null;
+  const tooltipContent = (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-100">{strategy.label}</p>
+        <p className="mt-1 text-xs leading-relaxed text-slate-300">{strategy.description}</p>
+      </div>
+      <div className="space-y-2 text-xs leading-relaxed text-slate-300">
+        <p>
+          <span className="font-semibold text-slate-100">Current score:</span>{" "}
+          {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "â€”"}
+        </p>
+        {strategy.investment_bounds ? (
+          <p>
+            <span className="font-semibold text-slate-100">Optimal range:</span> {strategy.investment_bounds}
+          </p>
+        ) : null}
+        {strategy.score_guidance ? (
+          <p>
+            <span className="font-semibold text-slate-100">Score guidance:</span> {strategy.score_guidance}
+          </p>
+        ) : null}
+      </div>
+    </div>
+  );
 
   return (
     <article className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <h3
-            className="text-base font-semibold text-slate-900"
-            title={tooltipText.length > 0 ? tooltipText : undefined}
-          >
-            {strategy.label}
-          </h3>
+        <div className="min-w-0 flex-1">
+          <div className="flex items-center gap-2">
+            <h3 className="text-base font-semibold text-slate-900">{strategy.label}</h3>
+            <Tooltip content={tooltipContent}>
+              <button
+                type="button"
+                aria-label={`Strategy details for ${strategy.label}`}
+                className="inline-flex h-6 w-6 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+              >
+                <InfoIcon />
+              </button>
+            </Tooltip>
+          </div>
           <p className="mt-1 text-sm leading-relaxed text-slate-500">{strategy.description}</p>
           {strategy.investment_bounds ? (
             <p className="mt-1 text-xs text-slate-400">
-              Investment criteria: <span className="font-medium text-slate-500">{strategy.investment_bounds}</span>
+              Optimal range: <span className="font-medium text-slate-500">{strategy.investment_bounds}</span>
             </p>
           ) : null}
         </div>
@@ -182,8 +212,20 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
           {badge.text}
         </span>
       </div>
+      <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
+          <span>Current Score</span>
+          <span className="text-sm font-semibold text-slate-900">
+            {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "â€”"}
+          </span>
+        </div>
+        {strategy.score_guidance ? (
+          <p className="mt-2 text-xs leading-relaxed text-slate-500">{strategy.score_guidance}</p>
+        ) : null}
+      </div>
       {renderConfidenceChart(strategy)}
       {renderMetadata(strategy)}
     </article>
   );
 }
+

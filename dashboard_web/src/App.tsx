@@ -233,9 +233,12 @@ function DashboardPage({
           </p>
         </div>
 
-        <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
-        <div className="grid gap-4 lg:grid-cols-[1fr,260px]">
-          <FinalScoreChart scores={finalScores} average={averageScore} />
+        <div className="grid gap-4 xl:grid-cols-[1fr,320px]">
+          <div className="space-y-4">
+            <AggregatedSignals signals={aggregatedSignals} />
+            <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
+            <FinalScoreChart scores={finalScores} average={averageScore} />
+          </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
             <h3 className="text-sm font-semibold text-slate-900">Save to watchlist</h3>
             <p className="mt-2 text-xs text-slate-500">
@@ -274,7 +277,6 @@ function DashboardPage({
         {analysis && (
           <>
             <PriceChart data={analysis.price_bars} annotations={annotations} latestAggregated={latestAggregated} />
-            <AggregatedSignals signals={aggregatedSignals} />
             <div className="grid gap-6 md:grid-cols-2">
               {strategyCards.map((strategy) => (
                 <StrategyCard key={strategy.name} strategy={strategy} />

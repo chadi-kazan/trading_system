@@ -19,6 +19,7 @@ class StrategyInfo(BaseModel):
     description: str
     chart_type: str
     investment_bounds: Optional[str] = None
+    score_guidance: Optional[str] = None
 
 
 class StrategySignalPayload(BaseModel):
@@ -34,6 +35,7 @@ class StrategyAnalysis(BaseModel):
     description: str
     chart_type: str
     investment_bounds: Optional[str] = None
+    score_guidance: Optional[str] = None
     signals: List[StrategySignalPayload] = Field(default_factory=list)
     latest_metadata: Optional[Dict[str, Any]] = None
     extras: Dict[str, Any] = Field(default_factory=dict)

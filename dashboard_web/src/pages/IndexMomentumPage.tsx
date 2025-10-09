@@ -1,8 +1,10 @@
-﻿import { useEffect, useMemo, useState, type ChangeEvent } from "react";
+import { useEffect, useMemo, useState, type ChangeEvent } from "react";
 import type { JSX } from "react";
 import { useNavigate } from "react-router-dom";
 import { fetchStrategies } from "../api";
 import { formatDisplayDate } from "../utils/date";
+import { Tooltip, InfoIcon } from "../components/Tooltip";
+
 import type {
   MomentumEntry,
   MomentumResponse,
@@ -36,7 +38,7 @@ type IndexMomentumPageProps = {
 
 function formatPercent(value: number | null | undefined, digits = 2): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "â€”";
+    return "—";
   }
   const rounded = Number.parseFloat(value.toFixed(digits));
   return `${rounded > 0 ? "+" : ""}${rounded.toFixed(digits)}%`;
@@ -44,14 +46,14 @@ function formatPercent(value: number | null | undefined, digits = 2): string {
 
 function formatCurrency(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "â€”";
+    return "—";
   }
   return `$${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`;
 }
 
 function formatNumber(value: number | null | undefined): string {
   if (value === null || value === undefined || Number.isNaN(value)) {
-    return "â€”";
+    return "—";
   }
   if (value >= 1_000_000_000) return `${(value / 1_000_000_000).toFixed(2)}B`;
   if (value >= 1_000_000) return `${(value / 1_000_000).toFixed(2)}M`;
@@ -174,6 +176,45 @@ export function IndexMomentumPage({
     [availableStrategies],
   );
 
+  const strategyMetaMap = useMemo(() => {
+    const map = new Map<string, StrategyInfo>();
+    availableStrategies.forEach((strategy) => {
+      map.set(strategy.name, strategy);
+    });
+    return map;
+  }, [availableStrategies]);
+
+  const renderStrategyTooltip = (strategy: StrategyInfo) => (
+    <div className="space-y-3">
+      <div>
+        <p className="text-sm font-semibold text-slate-100">{strategy.label}</p>
+        {strategy.description ? (
+          <p className="mt-1 text-xs leading-relaxed text-slate-300">{strategy.description}</p>
+        ) : null}
+      </div>
+      {strategy.investment_bounds ? (
+        <p className="text-xs text-slate-300">
+          <span className="font-semibold text-slate-100">Optimal range:</span> {strategy.investment_bounds}
+        </p>
+      ) : null}
+      {strategy.score_guidance ? (
+        <p className="text-xs leading-relaxed text-slate-300">
+          <span className="font-semibold text-slate-100">Score guidance:</span> {strategy.score_guidance}
+        </p>
+      ) : null}
+    </div>
+  );
+
+  const finalScoreTooltipContent = (
+    <div className="space-y-3">
+      <p className="text-sm font-semibold text-slate-100">Final Score</p>
+      <p className="text-xs leading-relaxed text-slate-300">
+        Weighted consensus across active strategies. Scores near 100% indicate strong alignment between high-confidence
+        strategies, while lower values highlight mixed or weak signals.
+      </p>
+    </div>
+  );
+
   const entries = useMemo(() => {
     if (!data) return [] as MomentumEntry[];
     const raw = view === "gainers" ? data.top_gainers : data.top_losers;
@@ -269,12 +310,44 @@ export function IndexMomentumPage({
 
   const renderSortIndicator = (key: SortKey) => {
     if (sortKey !== key) return null;
-    return <span className="ml-1 text-xs text-slate-400">{sortDirection === "desc" ? "â–¼" : "â–²"}</span>;
+    return <span className="ml-1 text-xs text-slate-400">{sortDirection === "desc" ? "▼" : "▲"}</span>;
   };
+
+  const renderStrategyHeader = (strategy: StrategyInfo) => (
+    <div className="flex items-center justify-end gap-1.5">
+      <span>{strategy.label}</span>
+      <Tooltip content={renderStrategyTooltip(strategy)}>
+        <button
+          type="button"
+          aria-label={`Strategy details for ${strategy.label}`}
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+        >
+          <InfoIcon />
+        </button>
+      </Tooltip>
+      {renderSortIndicator(`strategy:${strategy.name}` as SortKey)}
+    </div>
+  );
+
+  const renderFinalScoreHeader = () => (
+    <div className="flex items-center justify-end gap-1.5">
+      <span>Final Score</span>
+      <Tooltip content={finalScoreTooltipContent}>
+        <button
+          type="button"
+          aria-label="Final score details"
+          className="inline-flex h-5 w-5 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-500 shadow-sm transition hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+        >
+          <InfoIcon />
+        </button>
+      </Tooltip>
+      {renderSortIndicator("final_score")}
+    </div>
+  );
 
   const watchlistMapHas = (symbol: string) => watchlistMap.has(symbol.toUpperCase());
   const sortDirectionLabel = sortDirection === "desc" ? "descending" : "ascending";
-  const sortDirectionButtonLabel = sortDirection === "desc" ? "Desc â–¼" : "Asc â–²";
+  const sortDirectionButtonLabel = sortDirection === "desc" ? "Desc ▼" : "Asc ▲";
 
   return (
     <div className="mx-auto flex w-full max-w-screen-2xl flex-col gap-8 px-4 py-10 sm:px-6 lg:px-8">
@@ -367,7 +440,7 @@ export function IndexMomentumPage({
           <SummaryTile label="Universe Size" value={data?.universe_size} suffix="symbols" />
           <SummaryTile label="Evaluated" value={data?.evaluated_symbols} suffix="symbols" />
           <SummaryTile label="Skipped" value={data?.skipped_symbols} suffix="symbols" />
-          <SummaryTile label="Generated" value={data ? formatDisplayDate(data.generated_at) : "â€”"} isString />
+          <SummaryTile label="Generated" value={data ? formatDisplayDate(data.generated_at) : "—"} isString />
         </div>
       </section>
 
@@ -434,16 +507,15 @@ export function IndexMomentumPage({
                     className="py-3 pr-4 text-right cursor-pointer select-none"
                     onClick={() => handleSort("final_score")}
                   >
-                    Final Score {renderSortIndicator("final_score")}
+                    {renderFinalScoreHeader()}
                   </th>
                   {availableStrategies.map((strategy) => (
                     <th
                       key={strategy.name}
                       className="py-3 pr-4 text-right cursor-pointer select-none"
-                      onClick={() => handleSort(`strategy:${strategy.name}`)}
+                      onClick={() => handleSort(`strategy:${strategy.name}` as SortKey)}
                     >
-                      {strategy.label}
-                      {renderSortIndicator(`strategy:${strategy.name}`)}
+                      {renderStrategyHeader(strategy)}
                     </th>
                   ))}
                   <th className="py-3 pr-4 text-right">Watchlist</th>
@@ -492,7 +564,7 @@ function SummaryTile({
 }) {
   const display =
     value === null || value === undefined
-      ? "â€”"
+      ? "—"
       : isString
         ? String(value)
         : Number.isFinite(value)
@@ -537,7 +609,7 @@ function TableRow({
     entry.change_percent > 0 ? "text-emerald-600" : entry.change_percent < 0 ? "text-rose-600" : "text-slate-600";
   const relativeVolume = entry.relative_volume ?? null;
   const lastUpdatedDate = new Date(entry.updated_at);
-  const formattedUpdated = Number.isNaN(lastUpdatedDate.getTime()) ? "â€”" : formatDisplayDate(lastUpdatedDate);
+  const formattedUpdated = Number.isNaN(lastUpdatedDate.getTime()) ? "—" : formatDisplayDate(lastUpdatedDate);
   const feedbackClass =
     feedback?.type === "success" ? "text-emerald-600" : feedback?.type === "error" ? "text-rose-600" : "text-slate-500";
 
@@ -554,9 +626,9 @@ function TableRow({
       </td>
       <td className="whitespace-nowrap py-3 pr-4 font-semibold text-slate-900">{entry.symbol}</td>
       <td className="max-w-xs truncate py-3 pr-4 text-slate-600" title={entry.name ?? undefined}>
-        {entry.name ?? "â€”"}
+        {entry.name ?? "—"}
       </td>
-      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{entry.sector ?? "â€”"}</td>
+      <td className="whitespace-nowrap py-3 pr-4 text-slate-500">{entry.sector ?? "—"}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right font-medium text-slate-900">{formatCurrency(entry.last_price)}</td>
       <td className={`whitespace-nowrap py-3 pr-4 text-right font-semibold ${changeClass}`}>
         {formatPercent(entry.change_percent)}
@@ -566,7 +638,7 @@ function TableRow({
       </td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{formatNumber(entry.volume ?? null)}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">
-        {relativeVolume ? relativeVolume.toFixed(2) : "â€”"}
+        {relativeVolume ? relativeVolume.toFixed(2) : "—"}
         {relativeVolume && relativeVolume > 1.5 ? (
           <span className="ml-1 inline-flex items-center rounded-full bg-amber-100 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-amber-600">
             Elevated
@@ -576,7 +648,7 @@ function TableRow({
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-500">{entry.data_points}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right text-slate-400">{formattedUpdated}</td>
       <td className="whitespace-nowrap py-3 pr-4 text-right font-semibold text-slate-900">
-        {entry.final_score !== null && entry.final_score !== undefined ? formatPercent(entry.final_score * 100, 1) : "â€”"}
+        {entry.final_score !== null && entry.final_score !== undefined ? formatPercent(entry.final_score * 100, 1) : "—"}
       </td>
       {strategies.map((strategy) => {
         const rawScore = entry.strategy_scores?.[strategy.name] ?? 0;
@@ -618,7 +690,7 @@ function TableRow({
                 : "border-slate-200 bg-white text-slate-600 hover:border-blue-300 hover:text-blue-600"
             }`}
           >
-            {isSaving ? "Savingâ€¦" : `${isTracked ? "Update" : "Add"} Watchlist`}
+            {isSaving ? "Saving…" : `${isTracked ? "Update" : "Add"} Watchlist`}
           </button>
           <button
             type="button"
@@ -635,5 +707,6 @@ function TableRow({
 }
 
 export default IndexMomentumPage;
+
 
 

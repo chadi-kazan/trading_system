@@ -4,6 +4,7 @@ export type StrategyInfo = {
   description: string;
   chart_type: string;
   investment_bounds?: string | null;
+  score_guidance?: string | null;
 };
 
 export type StrategySignal = {
@@ -19,6 +20,7 @@ export type StrategyAnalysis = {
   description: string;
   chart_type: string;
   investment_bounds?: string | null;
+  score_guidance?: string | null;
   signals: StrategySignal[];
   latest_metadata?: Record<string, unknown> | null;
   extras: Record<string, unknown>;
