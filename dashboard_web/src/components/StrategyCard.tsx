@@ -1,4 +1,4 @@
-﻿import {
+import {
   Area,
   AreaChart,
   CartesianGrid,
@@ -125,7 +125,6 @@ function renderConfidenceChart(strategy: StrategyAnalysis) {
   );
 }
 
-
 function renderMetadata(strategy: StrategyAnalysis) {
   if (!strategy.latest_metadata) return null;
   const entries = Object.entries(strategy.latest_metadata)
@@ -160,16 +159,19 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
   const latestSignal = strategy.signals.at(-1);
   const latestConfidence = typeof latestSignal?.confidence === "number" ? latestSignal.confidence : null;
   const latestConfidencePercent = latestConfidence !== null ? Math.round(latestConfidence * 100) : null;
+
   const tooltipContent = (
     <div className="space-y-3">
       <div>
         <p className="text-sm font-semibold text-slate-100">{strategy.label}</p>
-        <p className="mt-1 text-xs leading-relaxed text-slate-300">{strategy.description}</p>
+        {strategy.description ? (
+          <p className="mt-1 text-xs leading-relaxed text-slate-300">{strategy.description}</p>
+        ) : null}
       </div>
       <div className="space-y-2 text-xs leading-relaxed text-slate-300">
         <p>
           <span className="font-semibold text-slate-100">Current score:</span>{" "}
-          {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "â€”"}
+          {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "—"}
         </p>
         {strategy.investment_bounds ? (
           <p>
@@ -201,12 +203,6 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
               </button>
             </Tooltip>
           </div>
-          <p className="mt-1 text-sm leading-relaxed text-slate-500">{strategy.description}</p>
-          {strategy.investment_bounds ? (
-            <p className="mt-1 text-xs text-slate-400">
-              Optimal range: <span className="font-medium text-slate-500">{strategy.investment_bounds}</span>
-            </p>
-          ) : null}
         </div>
         <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeStyles[badge.tone]}`}>
           {badge.text}
@@ -216,7 +212,7 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
         <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
           <span>Current Score</span>
           <span className="text-sm font-semibold text-slate-900">
-            {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "â€”"}
+            {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "—"}
           </span>
         </div>
         {strategy.score_guidance ? (
@@ -229,3 +225,4 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
   );
 }
 
+export default StrategyCard;

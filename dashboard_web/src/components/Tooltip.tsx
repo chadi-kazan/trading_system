@@ -18,10 +18,7 @@ export function Tooltip({ children, content, side = "top" }: TooltipProps) {
   const id = useId();
 
   const child = Children.only(children) as ReactElement<Record<string, unknown>>;
-  const trigger = cloneElement(
-    child,
-    open ? ({ "aria-describedby": id } as Record<string, unknown>) : undefined,
-  );
+  const trigger = cloneElement(child, open ? ({ "aria-describedby": id } as Record<string, unknown>) : undefined);
 
   const sidePosition =
     side === "top"
@@ -45,10 +42,10 @@ export function Tooltip({ children, content, side = "top" }: TooltipProps) {
         role="tooltip"
         id={id}
         className={`pointer-events-none absolute ${sidePosition} left-1/2 -translate-x-1/2 transition-all duration-150 ${
-          open ? "translate-y-0 opacity-100" : "translate-y-1 opacity-0"
+          open ? "translate-y-0 opacity-100 visible" : "translate-y-1 opacity-0 invisible"
         } z-50`}
       >
-        <span className="block max-w-xs rounded-xl border border-slate-700/70 bg-slate-900 px-4 py-3 text-xs leading-relaxed text-slate-200 shadow-2xl ring-1 ring-slate-700/60">
+        <span className="block min-w-[18rem] max-w-sm whitespace-pre-line rounded-xl border border-slate-700/70 bg-slate-900 px-5 py-4 text-xs leading-relaxed text-slate-200 shadow-2xl ring-1 ring-slate-700/60">
           {content}
         </span>
         <span
