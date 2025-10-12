@@ -150,6 +150,15 @@ Deliver a weekly-use research assistant for novice-to-intermediate small-cap inv
 - [x] ~~Fundamentals card: create a dedicated card component with metric tooltips (ideal range + interpretation) feeding off the new API field. (Completed: 2025-10-12)~~
 - [x] ~~Regression pass: adjust TypeScript types/hooks, wire up tooltips, ensure watchlist save, comparison, and momentum quick-links still work, and run the web/npm + pytest suites. (Completed: 2025-10-12)~~
 
+## Next Layer
+Ask before implementing because we will expand as we see signals improve
+- [] Volatility-Adjusted Positioning: Add ATR- or implied-volatility based sizing so high-vol names don’t dominate risk. You can also score setups by reward-to-risk relative to their recent volatility regime.
+- [] Relative Strength Rotation: Combine your fundamentals screen with cross-sector or style momentum (e.g., small vs large, growth vs value) to prioritize signals in stronger macro segments. A top-down RS rank layered on the current strategy scores helps triage crowded watchlists.
+- [] Insider/Ownership Dynamics: Monitor insider buys/sells and institutional accumulation. A light scoring adjustment when mutual fund flows align with your signals can weed out low-quality pop-and-drops.
+- [] Liquidity & Market Microstructure: Include short interest trends, dark-pool prints, or order-book imbalance proxies where data is available. These are particularly useful for small caps to avoid thin liquidity traps.
+- [] Alternative Data Hooks: Layer in sector-specific alternative metrics (web traffic, app downloads, satellite data) for your highest-conviction names. Even a simple Google Trends momentum score can be a useful confirm/deny slider.
+- [] Risk-Parity Watchlist: Build a meta-filter that looks for diversification across factor exposures (quality, value, growth, momentum). That way your watchlist avoids accidental concentration in, say, all high-beta tech setups.
+
 ## Future Analytics Backlog
 - Volatility-adjusted sizing and position throttling to complement trend overlays.
 - Cross-sector/style relative-strength rotation layer to prioritise opportunity sets.
