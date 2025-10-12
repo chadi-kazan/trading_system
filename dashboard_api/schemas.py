@@ -65,6 +65,22 @@ class EarningsQualityPayload(BaseModel):
     eps_trend: Optional[float] = None
 
 
+class FundamentalMetricPayload(BaseModel):
+    key: str
+    label: str
+    value: Optional[float] = None
+    display: Optional[str] = None
+    ideal: Optional[str] = None
+    interpretation: Optional[str] = None
+
+
+class FundamentalSnapshotPayload(BaseModel):
+    score: Optional[float] = None
+    updated_at: Optional[datetime] = None
+    notes: Optional[str] = None
+    metrics: List[FundamentalMetricPayload] = Field(default_factory=list)
+
+
 class PriceBar(BaseModel):
     date: datetime
     open: float
@@ -93,6 +109,7 @@ class SymbolAnalysisResponse(BaseModel):
     aggregated_signals: List[AggregatedSignalPayload] = Field(default_factory=list)
     macro_overlay: Optional[MacroOverlayPayload] = None
     earnings_quality: Optional[EarningsQualityPayload] = None
+    fundamentals: Optional[FundamentalSnapshotPayload] = None
 
 
 class SymbolSearchResult(BaseModel):
@@ -162,6 +179,8 @@ __all__ = [
     "AggregatedSignalPayload",
     "MacroOverlayPayload",
     "EarningsQualityPayload",
+    "FundamentalMetricPayload",
+    "FundamentalSnapshotPayload",
     "HealthResponse",
     "PriceBar",
     "SearchResponse",

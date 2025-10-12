@@ -12,5 +12,6 @@ data/universe/fundamentals_cache/
 .venv/
 node_modules/
 dashboard_web/node_modules/
+dashboard_web/dist/
 data/watchlist.db
 data/strategy_metrics.db

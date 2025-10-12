@@ -17,6 +17,17 @@ LOGGER = logging.getLogger(__name__)
 
 
 def _to_float(value: Any) -> float | None:
+    if isinstance(value, str):
+        stripped = value.strip()
+        if not stripped:
+            return None
+        is_percent = stripped.endswith("%")
+        cleaned = stripped.rstrip("%").replace(",", "")
+        try:
+            numeric = float(cleaned)
+        except ValueError:
+            return None
+        return numeric / 100.0 if is_percent else numeric
     try:
         return float(value)
     except (TypeError, ValueError):
@@ -30,12 +41,16 @@ def _load_json_fundamentals(path: Path) -> Dict[str, float]:
         return {}
 
     if isinstance(payload, dict):
+        fetched_at = payload.get("fetched_at")
         data = payload.get("data") if "data" in payload and isinstance(payload["data"], dict) else payload
-        return {
+        result = {
             str(key).lower(): converted
             for key, value in data.items()
             if (converted := _to_float(value)) is not None
         }
+        if fetched_at:
+            result["_fetched_at"] = str(fetched_at)
+        return result
     return {}
 
 
@@ -97,6 +112,46 @@ def _map_alpha_overview(payload: Dict[str, Any]) -> Dict[str, float]:
     market_cap = _to_float(payload.get("MarketCapitalization"))
     if market_cap is not None:
         metrics["market_cap"] = market_cap
+
+    pe_ratio = _to_float(payload.get("PERatio"))
+    if pe_ratio is not None:
+        metrics["pe_ratio"] = pe_ratio
+
+    peg_ratio = _to_float(payload.get("PEGRatio"))
+    if peg_ratio is not None:
+        metrics["peg_ratio"] = peg_ratio
+
+    eps = _to_float(payload.get("EPS"))
+    if eps is not None:
+        metrics["eps"] = eps
+
+    ebitda = _to_float(payload.get("EBITDA"))
+    if ebitda is not None:
+        metrics["ebitda"] = ebitda
+
+    dividend_yield = _to_float(payload.get("DividendYield"))
+    if dividend_yield is not None:
+        metrics["dividend_yield"] = dividend_yield
+
+    revenue_ttm = _to_float(payload.get("RevenueTTM"))
+    if revenue_ttm is not None:
+        metrics["revenue_ttm"] = revenue_ttm
+
+    profit_margin = _to_float(payload.get("ProfitMargin"))
+    if profit_margin is not None:
+        metrics["profit_margin"] = profit_margin
+
+    operating_margin = _to_float(payload.get("OperatingMarginTTM"))
+    if operating_margin is not None:
+        metrics["operating_margin"] = operating_margin
+
+    return_on_equity = _to_float(payload.get("ReturnOnEquityTTM"))
+    if return_on_equity is not None:
+        metrics["return_on_equity"] = return_on_equity
+
+    debt_to_equity = _to_float(payload.get("DebtToEquityRatio"))
+    if debt_to_equity is not None:
+        metrics["debt_to_equity"] = debt_to_equity
 
     return metrics
 
@@ -189,8 +244,20 @@ def load_fundamental_metrics(
             LOGGER.warning("Alpha Vantage overview fetch failed for %s: %s", cleaned_symbol, exc)
         else:
             mapped = _map_alpha_overview(overview)
-            if mapped:
-                return mapped
+            earnings_metrics: Dict[str, float] = {}
+            try:
+                earnings_payload = av_client.fetch_earnings(cleaned_symbol)
+            except (AlphaVantageError, Exception) as exc:  # pragma: no cover - network faults
+                LOGGER.debug("Alpha Vantage earnings fetch failed for %s: %s", cleaned_symbol, exc)
+            else:
+                earnings_metrics = _map_earnings_metrics(earnings_payload)
+
+            if mapped or earnings_metrics:
+                result: Dict[str, float] = {}
+                result.update(mapped)
+                result.update(earnings_metrics)
+                result["_fetched_at"] = datetime.utcnow().isoformat()
+                return result
 
     return {}
 

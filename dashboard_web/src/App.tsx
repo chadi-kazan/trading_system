@@ -1,14 +1,34 @@
-import { useCallback, useEffect, useMemo, useState } from "react";
-import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { fetchSectorScores, fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
-import type { AggregatedSignal, StrategyInfo, StrategyScore, SymbolAnalysis, SymbolSearchResult } from "./types";
-import { SearchPanel } from "./components/SearchPanel";
+import { useEffect, useMemo, useState } from "react";
+import {
+  BrowserRouter,
+  NavLink,
+  Route,
+  Routes,
+  useLocation,
+  useNavigate,
+  useParams,
+} from "react-router-dom";
+import {
+  fetchSectorScores,
+  fetchStrategies,
+  fetchSymbolAnalysis,
+  searchSymbols,
+} from "./api";
+import type {
+  AggregatedSignal,
+  StrategyInfo,
+  StrategyScore,
+  SymbolAnalysis,
+  SymbolSearchResult,
+} from "./types";
 import { PriceChart } from "./components/PriceChart";
 import { StrategyCard } from "./components/StrategyCard";
-import { SignalComparisonPanel } from "./components/SignalComparisonPanel";
 import { AggregatedSignals } from "./components/AggregatedSignals";
 import { ScenarioCallouts } from "./components/ScenarioCallouts";
 import { FinalScoreChart } from "./components/FinalScoreChart";
+import { SignalComparisonPanel } from "./components/SignalComparisonPanel";
+import { FundamentalsCard } from "./components/FundamentalsCard";
+import { SearchPage } from "./pages/SearchPage";
 import { WatchlistPage } from "./pages/WatchlistPage";
 import { SignalGuide } from "./pages/SignalGuide";
 import { GlossaryPage } from "./pages/GlossaryPage";
@@ -18,7 +38,7 @@ import { SPMomentumPage } from "./pages/SPMomentumPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
-import { InfoIcon, Tooltip } from "./components/Tooltip";
+import { Tooltip, InfoIcon } from "./components/Tooltip";
 
 const THREE_YEARS_AGO = new Date();
 THREE_YEARS_AGO.setDate(THREE_YEARS_AGO.getDate() - 365 * 3);
@@ -27,196 +47,161 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
-function formatPercentValue(value: number | null | undefined, digits = 0): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
-  }
+function formatPercent(value: number | null | undefined, digits = 0): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "--";
   return `${(value * 100).toFixed(digits)}%`;
 }
 
-function formatRawPercent(value: number | null | undefined, digits = 1): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return "—";
-  }
-  return `${value.toFixed(digits)}%`;
-}
-
-function formatMultiplierValue(value: number | null | undefined): string {
-  if (value === null || value === undefined || Number.isNaN(value)) {
-    return "×1.00";
-  }
-  return `×${value.toFixed(2)}`;
+function formatMultiplier(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) return "x1.00";
+  return `x${value.toFixed(2)}`;
 }
 
 type MetricDescriptor = {
   label: string;
   ideal: string;
-  compare: (value: number) => string;
-  format?: (value: number) => string;
+  compare: (n: number) => string;
+  format?: (n: number) => string;
   chipClass?: string;
   chipLabel?: string;
 };
 
-const macroFactorDescriptors: Record<string, MetricDescriptor> = {
+const MACRO_DESCRIPTORS: Record<string, MetricDescriptor> = {
   vix: {
     label: "VIX level",
     ideal: "Below 20 (calm volatility)",
-    format: (value) => value.toFixed(2),
-    compare: (value) => {
-      if (value < 18) return "Comfortably calm – supportive for risk-on.";
-      if (value < 25) return "Volatility is elevated but manageable.";
-      return "Volatility stress – tighten exposure.";
+    format: (v) => v.toFixed(2),
+    compare: (v) => {
+      if (v < 18) return "Volatility backdrop is calm.";
+      if (v < 25) return "Volatility is elevated but manageable.";
+      return "Volatility stress detected.";
     },
   },
   vix_score: {
     label: "VIX score",
     ideal: "Above 0.60",
-    format: (value) => formatPercentValue(value, 0),
-    compare: (value) => {
-      if (value >= 0.7) return "Volatility backdrop favours risk-taking.";
-      if (value >= 0.5) return "Neutral volatility conditions.";
-      return "Volatility score warns of caution.";
+    format: (v) => formatPercent(v, 0),
+    compare: (v) => {
+      if (v >= 0.7) return "Volatility supports risk-taking.";
+      if (v >= 0.5) return "Volatility readings are neutral.";
+      return "Volatility signals caution.";
     },
   },
   credit_ratio: {
     label: "HYG/LQD ratio",
     ideal: "Above 0.97",
-    format: (value) => value.toFixed(3),
-    compare: (value) => {
-      if (value >= 0.98) return "Credit markets are signalling confidence.";
-      if (value >= 0.95) return "Credit tone is neutral.";
-      return "Credit markets are defensive – monitor spreads.";
+    format: (v) => v.toFixed(3),
+    compare: (v) => {
+      if (v >= 0.98) return "Credit markets signal confidence.";
+      if (v >= 0.95) return "Credit tone is neutral.";
+      return "Credit markets defensive; monitor spreads.";
     },
   },
   credit_score: {
     label: "Credit score",
     ideal: "Above 0.60",
-    format: (value) => formatPercentValue(value, 0),
-    compare: (value) => {
-      if (value >= 0.7) return "Supportive credit momentum.";
-      if (value >= 0.5) return "Mixed credit signals.";
-      return "Credit stress is building – reduce risk.";
+    format: (v) => formatPercent(v, 0),
+    compare: (v) => {
+      if (v >= 0.7) return "Supportive credit momentum.";
+      if (v >= 0.5) return "Mixed credit signals.";
+      return "Credit stress building; reduce risk.";
     },
   },
   spy_20d_return: {
     label: "SPY 20D return",
-    ideal: "Positive momentum (> 0%)",
-    format: (value) => formatPercentValue(value, 1),
-    compare: (value) => {
-      if (value >= 0.05) return "Strong equity momentum tailwind.";
-      if (value >= 0) return "Trend is modestly positive.";
-      return "Equity trend is negative – headwinds increasing.";
+    ideal: "Positive momentum",
+    format: (v) => formatPercent(v, 1),
+    compare: (v) => {
+      if (v >= 0.05) return "Equity momentum is strong.";
+      if (v >= 0) return "Trend is modestly positive.";
+      return "Equity trend is negative.";
     },
   },
   trend_score: {
     label: "Trend score",
     ideal: "Above 0.55",
-    format: (value) => formatPercentValue(value, 0),
-    compare: (value) => {
-      if (value >= 0.65) return "Trend regime is firmly risk-on.";
-      if (value >= 0.5) return "Trend regime is balanced.";
-      return "Trend regime is defensive.";
+    format: (v) => formatPercent(v, 0),
+    compare: (v) => {
+      if (v >= 0.65) return "Trend regime is risk-on.";
+      if (v >= 0.5) return "Trend regime is balanced.";
+      return "Trend regime defensive.";
     },
   },
 };
 
-const defaultMacroDescriptor: MetricDescriptor = {
+const DEFAULT_MACRO_DESCRIPTOR: MetricDescriptor = {
   label: "Metric",
   ideal: "Monitor for context",
-  format: (value) => Number(value).toFixed(3),
   compare: () => "No benchmark available.",
+  format: (v) => v.toFixed(3),
 };
 
-const earningsMetricDescriptors: Record<string, MetricDescriptor> = {
+const EARNINGS_DESCRIPTORS: Record<string, MetricDescriptor> = {
   score: {
     label: "Composite score",
-    ideal: "≥ 0.70",
-    format: (value) => formatPercentValue(value, 0),
-    compare: (value) => {
-      if (value >= 0.7) return "Earnings momentum is strong.";
-      if (value >= 0.5) return "Earnings momentum is mixed.";
-      return "Earnings momentum is weak.";
-    },
+    ideal: ">= 0.70",
+    format: (v) => formatPercent(v, 0),
+    compare: (v) =>
+      v >= 0.7 ? "Earnings momentum is strong." : v >= 0.5 ? "Earnings momentum is mixed." : "Earnings momentum is weak.",
     chipClass: "rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700",
     chipLabel: "Score",
   },
   multiplier: {
     label: "Confidence multiplier",
-    ideal: "≥ ×0.90",
-    format: (value) => formatMultiplierValue(value),
-    compare: (value) => {
-      if (value >= 0.9) return "Earnings outlook is boosting signals.";
-      if (value >= 0.8) return "Earnings outlook is neutral.";
-      return "Earnings outlook is diluting conviction.";
-    },
+    ideal: ">= x0.90",
+    format: (v) => formatMultiplier(v),
+    compare: (v) =>
+      v >= 0.9 ? "Earnings outlook boosts signals." : v >= 0.8 ? "Earnings outlook is neutral." : "Earnings outlook dilutes conviction.",
     chipClass: "rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700",
     chipLabel: "Multiplier",
   },
   positive_ratio: {
     label: "Beat ratio",
-    ideal: "≥ 60% of reports beating estimates",
-    format: (value) => formatPercentValue(value, 0),
-    compare: (value) => {
-      if (value >= 0.65) return "Companies are consistently beating estimates.";
-      if (value >= 0.5) return "Beat rate is acceptable but mixed.";
-      return "Beat rate is soft – conviction is lower.";
-    },
+    ideal: ">= 60% beats",
+    format: (v) => formatPercent(v, 0),
+    compare: (v) =>
+      v >= 0.65 ? "Companies consistently beating estimates." : v >= 0.5 ? "Beat rate acceptable." : "Beat rate is soft.",
     chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
     chipLabel: "Beats",
   },
   surprise_average: {
     label: "Average surprise",
-    ideal: "≥ +5%",
-    format: (value) => formatPercentValue(value, 1),
-    compare: (value) => {
-      if (value >= 0.05) return "Strong upside surprises supporting momentum.";
-      if (value >= 0) return "Surprise trend is steady.";
-      return "Negative surprises dragging on momentum.";
-    },
+    ideal: ">= +5%",
+    format: (v) => formatPercent(v, 1),
+    compare: (v) =>
+      v >= 0.05 ? "Upside surprises support momentum." : v >= 0 ? "Surprise trend is steady." : "Negative surprises drag momentum.",
     chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
     chipLabel: "Avg surprise",
   },
   eps_trend: {
     label: "EPS trend",
-    ideal: "Positive quarter-over-quarter",
-    format: (value) => formatPercentValue(value, 1),
-    compare: (value) => {
-      if (value >= 0.05) return "EPS growth is accelerating.";
-      if (value >= 0) return "EPS trend is stable.";
-      return "EPS trend is declining – monitor fundamentals.";
-    },
+    ideal: "Positive QoQ",
+    format: (v) => formatPercent(v, 1),
+    compare: (v) =>
+      v >= 0.05 ? "EPS growth is accelerating." : v >= 0 ? "EPS trend is stable." : "EPS trend is declining.",
     chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
     chipLabel: "EPS trend",
   },
 };
 
-const defaultEarningsDescriptor: MetricDescriptor = {
+const DEFAULT_EARNINGS_DESCRIPTOR: MetricDescriptor = {
   label: "Metric",
   ideal: "Refer to context",
-  format: (value) => Number(value).toFixed(3),
   compare: () => "No benchmark available.",
+  format: (v) => v.toFixed(3),
   chipClass: "rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700",
   chipLabel: "Metric",
 };
-
 function getMacroDescriptor(key: string): MetricDescriptor {
-  const descriptor = macroFactorDescriptors[key];
-  if (descriptor) {
-    return descriptor;
-  }
-  return {
-    ...defaultMacroDescriptor,
+  return MACRO_DESCRIPTORS[key] ?? {
+    ...DEFAULT_MACRO_DESCRIPTOR,
     label: key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
   };
 }
 
 function getEarningsDescriptor(key: string): MetricDescriptor {
-  const descriptor = earningsMetricDescriptors[key];
-  if (descriptor) {
-    return descriptor;
-  }
-  return {
-    ...defaultEarningsDescriptor,
+  return EARNINGS_DESCRIPTORS[key] ?? {
+    ...DEFAULT_EARNINGS_DESCRIPTOR,
     label: key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
   };
 }
@@ -232,8 +217,10 @@ function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined
 
   const danZanger = strategies.find((strategy) => strategy.name === "dan_zanger_cup_handle");
   if (danZanger?.latest_metadata) {
-    annotations.breakout = typeof danZanger.latest_metadata.breakout_price === "number" ? danZanger.latest_metadata.breakout_price : null;
-    annotations.handleHigh = typeof danZanger.latest_metadata.right_peak === "number" ? danZanger.latest_metadata.right_peak : null;
+    annotations.breakout =
+      typeof danZanger.latest_metadata.breakout_price === "number" ? danZanger.latest_metadata.breakout_price : null;
+    annotations.handleHigh =
+      typeof danZanger.latest_metadata.right_peak === "number" ? danZanger.latest_metadata.right_peak : null;
   }
 
   const trend = strategies.find((strategy) => strategy.name === "trend_following");
@@ -243,7 +230,6 @@ function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined
 
   return annotations;
 }
-
 type SavePayload = {
   symbol: string;
   status: WatchlistStatus;
@@ -252,57 +238,122 @@ type SavePayload = {
   aggregatedSignal?: AggregatedSignal | null;
 };
 
-function DashboardPage({
+type SymbolDashboardProps = {
+  strategiesMeta: StrategyInfo[];
+  onSave: (payload: SavePayload) => void;
+  watchlistItems: SavedSignal[];
+  strategyWeights: Record<string, number>;
+};
+function SymbolDashboardPage({
   strategiesMeta,
   onSave,
   watchlistItems,
   strategyWeights,
-}: {
-  strategiesMeta: StrategyInfo[];
-  onSave: (payload: SavePayload) => Promise<void> | void;
-  watchlistItems: SavedSignal[];
-  strategyWeights: Record<string, number>;
-}) {
-  const location = useLocation();
+}: SymbolDashboardProps) {
+  const { symbol: symbolParam } = useParams<{ symbol: string }>();
   const navigate = useNavigate();
+  const location = useLocation();
 
-  const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
-  const [selectedSymbol, setSelectedSymbol] = useState<SymbolSearchResult | null>(null);
+  const symbol = symbolParam?.toUpperCase() ?? null;
+
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null);
-  const [comparisonAnalyses, setComparisonAnalyses] = useState<Record<string, SymbolAnalysis>>({});
-  const [comparisonInputs, setComparisonInputs] = useState<{ primary: string; secondary: string }>({ primary: "", secondary: "" });
-  const [loadingComparison, setLoadingComparison] = useState(false);
-  const [comparisonError, setComparisonError] = useState<string | null>(null);
-  const [activeComparison, setActiveComparison] = useState<{ primary: string; secondary: string } | null>(null);
-  const [loadingSearch, setLoadingSearch] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sectorScores, setSectorScores] = useState<Record<string, { average: number; sampleSize: number }> | null>(null);
   const [sectorContext, setSectorContext] = useState<{ sector?: string | null; sampleSize: number; universe?: string | null } | null>(null);
-  const [lastQuery, setLastQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<WatchlistStatus>(WATCHLIST_STATUSES[0]);
-  const [pendingAutoSave, setPendingAutoSave] = useState<WatchlistStatus | null>(null);
+  const [symbolMeta, setSymbolMeta] = useState<SymbolSearchResult | null>(null);
 
-  const selectedSymbolKey = selectedSymbol?.symbol ? selectedSymbol.symbol.toUpperCase() : null;
-  const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
+  const [comparisonAnalyses, setComparisonAnalyses] = useState<Record<string, SymbolAnalysis>>({});
+  const [comparisonInputs, setComparisonInputs] = useState<{ primary: string; secondary: string }>({ primary: symbol ?? "", secondary: "" });
+  const [loadingComparison, setLoadingComparison] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [activeComparison, setActiveComparison] = useState<{ primary: string; secondary: string } | null>(null);
+
+  useEffect(() => {
+    if (!symbol) {
+      setAnalysis(null);
+      setSectorScores(null);
+      setSectorContext(null);
+      return;
+    }
+    const existing = watchlistItems.find((item) => item.symbol.toUpperCase() === symbol);
+    setSelectedStatus(existing?.status ?? WATCHLIST_STATUSES[0]);
+  }, [symbol, watchlistItems]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    setLoadingAnalysis(true);
+    setError(null);
+    fetchSymbolAnalysis({
+      symbol,
+      start: formatDate(THREE_YEARS_AGO),
+      end: formatDate(new Date()),
+      interval: "1d",
+    })
+      .then((data) => setAnalysis(data))
+      .catch((err) => {
+        setError((err as Error).message);
+        setAnalysis(null);
+      })
+      .finally(() => setLoadingAnalysis(false));
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!symbol) {
+      setSectorScores(null);
+      setSectorContext(null);
+      return;
+    }
+    fetchSectorScores(symbol)
+      .then((response) => {
+        const scores: Record<string, { average: number; sampleSize: number }> = {};
+        response.strategy_scores.forEach((entry) => {
+          scores[entry.strategy] = { average: entry.average_score, sampleSize: entry.sample_size };
+        });
+        setSectorScores(scores);
+        setSectorContext({ sector: response.sector, sampleSize: response.sample_size, universe: response.universe ?? null });
+      })
+      .catch(() => {
+        setSectorScores(null);
+        setSectorContext(null);
+      });
+  }, [symbol]);
+
+  useEffect(() => {
+    if (!symbol) return;
+    setComparisonInputs((prev) => ({ ...prev, primary: symbol }));
+    setComparisonAnalyses({});
+    setComparisonError(null);
+    setActiveComparison(null);
+  }, [symbol]);
+
+  useEffect(() => {
+    const state = location.state as { status?: WatchlistStatus } | undefined;
+    if (state?.status && symbol) setSelectedStatus(state.status);
+    if (state) navigate(location.pathname, { replace: true, state: undefined });
+  }, [location, navigate, symbol]);
+
+  useEffect(() => {
+    if (!symbol) {
+      setSymbolMeta(null);
+      return;
+    }
+    searchSymbols(symbol)
+      .then((matches) => {
+        const direct = matches.find((item) => item.symbol.toUpperCase() === symbol);
+        if (direct) setSymbolMeta(direct);
+      })
+      .catch(() => undefined);
+  }, [symbol]);
+  const aggregatedSignals = analysis?.aggregated_signals ?? [];
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
   const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
   const macroOverlay = analysis?.macro_overlay ?? null;
   const macroFactorEntries = macroOverlay ? Object.entries(macroOverlay.factors ?? {}) : [];
   const earningsQuality = analysis?.earnings_quality ?? null;
-  const earningsMetricEntries = useMemo(
-    () =>
-      earningsQuality
-        ? [
-          { key: "score", value: earningsQuality.score ?? null },
-          { key: "multiplier", value: earningsQuality.multiplier ?? null },
-          { key: "positive_ratio", value: earningsQuality.positive_ratio ?? null },
-          { key: "surprise_average", value: earningsQuality.surprise_average ?? null },
-          { key: "eps_trend", value: earningsQuality.eps_trend ?? null },
-        ]
-        : [],
-    [earningsQuality],
-  );
+  const fundamentalsSnapshot = analysis?.fundamentals ?? null;
+
   const finalScores: StrategyScore[] = useMemo(() => {
     if (!strategyCards.length) return [];
     return strategyCards.map((strategy) => {
@@ -316,251 +367,73 @@ function DashboardPage({
       };
     });
   }, [strategyCards]);
+
   const averageScore = useMemo(() => {
-    if (finalScores.length === 0) {
-      return 0;
-    }
+    if (finalScores.length === 0) return 0;
     const weightedSum = finalScores.reduce((sum, entry) => {
       const weight = strategyWeights[entry.name] ?? 0;
       return sum + entry.value * weight;
     }, 0);
     const totalWeight = finalScores.reduce((sum, entry) => sum + (strategyWeights[entry.name] ?? 0), 0);
-    if (totalWeight > 0) {
-      return weightedSum / totalWeight;
-    }
+    if (totalWeight > 0) return weightedSum / totalWeight;
     return finalScores.reduce((sum, entry) => sum + entry.value, 0) / finalScores.length;
   }, [finalScores, strategyWeights]);
+
   const latestAggregated = aggregatedSignals.at(-1) ?? null;
 
-  useEffect(() => {
-    const state = (location.state as { symbol?: string; status?: WatchlistStatus } | undefined) || {};
-    if (state.symbol) {
-      const symbol = state.symbol.toUpperCase();
-      const existing = watchlistItems.find((item) => item.symbol.toUpperCase() === symbol);
-      setSelectedStatus(existing?.status ?? WATCHLIST_STATUSES[0]);
-      setPendingAutoSave(existing?.status ?? WATCHLIST_STATUSES[0]);
-      setSelectedSymbol({
-        symbol,
-        name: existing?.symbol ?? symbol,
-        type: existing ? "" : "",
-        region: "",
-        currency: "",
-        match_score: 0,
-      });
-      loadSymbolAnalysis(symbol).catch(() => undefined);
-      navigate(location.pathname, { replace: true });
-    }
-  }, [location.state, watchlistItems, navigate]);
-
-  useEffect(() => {
-    if (analysis && selectedSymbol && pendingAutoSave) {
-      handleSave(pendingAutoSave);
-      setPendingAutoSave(null);
-    }
-  }, [analysis, selectedSymbol, pendingAutoSave]);
-
-  const performSearch = async (query: string) => {
-    setLoadingSearch(true);
-    setError(null);
-    try {
-      const results = await searchSymbols(query);
-      setSearchResults(results);
-      setLastQuery(query);
-    } catch (err) {
-      console.error(err);
-      setError((err as Error).message);
-    } finally {
-      setLoadingSearch(false);
-    }
+  const handleSave = (statusOverride?: WatchlistStatus) => {
+    if (!symbol || !analysis || finalScores.length === 0) return;
+    onSave({
+      symbol,
+      status: statusOverride ?? selectedStatus,
+      finalScores,
+      averageScore,
+      aggregatedSignal: aggregatedSignals.at(-1) ?? null,
+    });
   };
 
-  const loadSymbolAnalysis = async (symbol: string) => {
-    setLoadingAnalysis(true);
-    setError(null);
-    try {
-      const data = await fetchSymbolAnalysis({
-        symbol,
-        start: formatDate(THREE_YEARS_AGO),
-        end: formatDate(new Date()),
-        interval: "1d",
-      });
-      setAnalysis(data);
-      setComparisonAnalyses((prev) => ({
-        ...prev,
-        [symbol.toUpperCase()]: data,
-      }));
-    } catch (err) {
-      console.error(err);
-      setError((err as Error).message);
-    } finally {
-      setLoadingAnalysis(false);
-    }
-  };
-
-  const getAnalysisForSymbol = useCallback(
-    (symbol: string | null | undefined): SymbolAnalysis | undefined => {
-      if (!symbol) return undefined;
-      const key = symbol.toUpperCase();
-      if (selectedSymbolKey && key === selectedSymbolKey && analysis) {
-        return analysis;
-      }
-      return comparisonAnalyses[key];
-    },
-    [analysis, comparisonAnalyses, selectedSymbolKey],
-  );
-
-  const computeLatestStrategyScore = (payload: SymbolAnalysis | undefined, strategyName: string): number | null => {
-    if (!payload) return null;
-    const strategy = payload.strategies.find((item) => item.name === strategyName);
-    if (!strategy) return null;
-    const latest = strategy.signals.at(-1);
-    const confidence = typeof latest?.confidence === "number" ? latest.confidence : null;
-    if (confidence === null || Number.isNaN(confidence)) return null;
-    const clamped = Math.max(0, Math.min(confidence, 1));
-    return clamped * 100;
-  };
-
-  const computeLatestFinalScore = (payload: SymbolAnalysis | undefined): number | null => {
-    if (!payload) return null;
-    const latest = payload.aggregated_signals.at(-1);
-    const confidence = typeof latest?.confidence === "number" ? latest.confidence : null;
-    if (confidence === null || Number.isNaN(confidence)) return null;
-    const clamped = Math.max(0, Math.min(confidence, 1));
-    return clamped * 100;
-  };
-
-  const fetchComparisonAnalysis = useCallback(
-    async (symbol: string): Promise<SymbolAnalysis> => {
-      const key = (symbol || "").trim().toUpperCase();
-      if (!key) {
-        throw new Error("Enter a symbol to compare.");
-      }
-
-      if (selectedSymbolKey && key === selectedSymbolKey && analysis) {
-        setComparisonAnalyses((prev) => {
-          const existing = prev[key];
-          if (existing === analysis) {
-            return prev;
-          }
-          return { ...prev, [key]: analysis };
-        });
-        return analysis;
-      }
-
-      const cached = comparisonAnalyses[key];
-      if (cached) {
-        return cached;
-      }
-
-      const data = await fetchSymbolAnalysis({
-        symbol: key,
-        start: formatDate(THREE_YEARS_AGO),
-        end: formatDate(new Date()),
-        interval: "1d",
-      });
-      setComparisonAnalyses((prev) => ({
-        ...prev,
-        [key]: data,
-      }));
-      return data;
-    },
-    [analysis, comparisonAnalyses, selectedSymbolKey],
-  );
-
-  const handleCompareSymbols = useCallback(async () => {
-    const primary = (comparisonInputs.primary || "").trim().toUpperCase();
-    const secondary = (comparisonInputs.secondary || "").trim().toUpperCase();
-
-    if (!primary || !secondary) {
-      setComparisonError("Enter two symbols to compare.");
-      return;
-    }
-    if (primary === secondary) {
-      setComparisonError("Choose two different symbols to compare.");
-      return;
-    }
-
-    setLoadingComparison(true);
-    setComparisonError(null);
-    try {
-      await Promise.all([fetchComparisonAnalysis(primary), fetchComparisonAnalysis(secondary)]);
-      setActiveComparison({ primary, secondary });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : "Unable to run comparison.";
-      setComparisonError(message);
-    } finally {
-      setLoadingComparison(false);
-    }
-  }, [comparisonInputs, fetchComparisonAnalysis]);
-
-  const handleComparisonInputChange = useCallback((field: "primary" | "secondary", value: string) => {
-    setComparisonInputs((prev) => ({
-      ...prev,
-      [field]: value.toUpperCase(),
-    }));
-    setComparisonError(null);
-  }, []);
-
-  const handleSwapComparison = useCallback(() => {
-    setComparisonInputs((prev) => ({
-      primary: prev.secondary,
-      secondary: prev.primary,
-    }));
-    setComparisonError(null);
-  }, []);
-
-  useEffect(() => {
-    if (!selectedSymbol) {
-      setSectorScores(null);
-      setSectorContext(null);
-      return;
-    }
-
-    fetchSectorScores(selectedSymbol.symbol)
-      .then((response) => {
-        const scores: Record<string, { average: number; sampleSize: number }> = {};
-        response.strategy_scores.forEach((entry) => {
-          scores[entry.strategy] = { average: entry.average_score, sampleSize: entry.sample_size };
-        });
-        setSectorScores(scores);
-        setSectorContext({
-          sector: response.sector,
-          sampleSize: response.sample_size,
-          universe: response.universe ?? null,
-        });
-      })
-      .catch(() => {
-        setSectorScores(null);
-        setSectorContext(null);
-      });
-  }, [selectedSymbol?.symbol]);
-
-  useEffect(() => {
-    if (selectedSymbol?.symbol) {
-      const upper = selectedSymbol.symbol.toUpperCase();
-      setComparisonInputs((prev) => ({
-        ...prev,
-        primary: upper,
-      }));
-      setActiveComparison((prev) => {
-        if (prev && prev.primary === upper) {
-          return prev;
+  const fetchComparisonAnalysis = useMemo(
+    () =>
+      async (target: string) => {
+        const key = target.toUpperCase();
+        if (analysis && key === symbol) {
+          setComparisonAnalyses((prev) => ({ ...prev, [key]: analysis }));
+          return analysis;
         }
-        return null;
-      });
-      setComparisonError(null);
-    }
-  }, [selectedSymbol?.symbol]);
+        const cached = comparisonAnalyses[key];
+        if (cached) return cached;
+        const data = await fetchSymbolAnalysis({
+          symbol: key,
+          start: formatDate(THREE_YEARS_AGO),
+          end: formatDate(new Date()),
+          interval: "1d",
+        });
+        setComparisonAnalyses((prev) => ({ ...prev, [key]: data }));
+        return data;
+      },
+    [analysis, comparisonAnalyses, symbol],
+  );
 
   const comparisonRows = useMemo(() => {
     if (!activeComparison) return [];
-    const primaryAnalysis = getAnalysisForSymbol(activeComparison.primary);
-    const secondaryAnalysis = getAnalysisForSymbol(activeComparison.secondary);
-    if (!primaryAnalysis || !secondaryAnalysis) return [];
+    const primary =
+      comparisonAnalyses[activeComparison.primary.toUpperCase()] ??
+      (symbol === activeComparison.primary.toUpperCase() ? analysis ?? undefined : undefined);
+    const secondary =
+      comparisonAnalyses[activeComparison.secondary.toUpperCase()] ??
+      (symbol === activeComparison.secondary.toUpperCase() ? analysis ?? undefined : undefined);
+    if (!primary || !secondary) return [];
 
     return strategiesMeta.map((meta) => {
-      const primaryScore = computeLatestStrategyScore(primaryAnalysis, meta.name);
-      const secondaryScore = computeLatestStrategyScore(secondaryAnalysis, meta.name);
+      const scoreFor = (payload: SymbolAnalysis) => {
+        const strat = payload.strategies.find((item) => item.name === meta.name);
+        if (!strat) return null;
+        const latest = strat.signals.at(-1);
+        if (!latest || typeof latest.confidence !== "number") return null;
+        return Math.max(0, Math.min(latest.confidence, 1)) * 100;
+      };
+      const primaryScore = scoreFor(primary);
+      const secondaryScore = scoreFor(secondary);
       const difference =
         primaryScore !== null && secondaryScore !== null ? primaryScore - secondaryScore : null;
       return {
@@ -571,276 +444,159 @@ function DashboardPage({
         difference,
       };
     });
-  }, [activeComparison, getAnalysisForSymbol, strategiesMeta]);
+  }, [activeComparison, analysis, comparisonAnalyses, strategiesMeta, symbol]);
 
   const comparisonSummary = useMemo(() => {
     if (!activeComparison) return null;
-    const primaryAnalysis = getAnalysisForSymbol(activeComparison.primary);
-    const secondaryAnalysis = getAnalysisForSymbol(activeComparison.secondary);
-    if (!primaryAnalysis || !secondaryAnalysis) return null;
-
-    return {
-      primaryScore: computeLatestFinalScore(primaryAnalysis),
-      secondaryScore: computeLatestFinalScore(secondaryAnalysis),
+    const take = (payload: SymbolAnalysis | undefined) => {
+      const latest = payload?.aggregated_signals.at(-1);
+      if (!latest || typeof latest.confidence !== "number") return null;
+      return Math.max(0, Math.min(latest.confidence, 1)) * 100;
     };
-  }, [activeComparison, getAnalysisForSymbol]);
+    const primary =
+      take(
+        comparisonAnalyses[activeComparison.primary.toUpperCase()] ??
+          (symbol === activeComparison.primary.toUpperCase() ? analysis ?? undefined : undefined),
+      );
+    const secondary =
+      take(
+        comparisonAnalyses[activeComparison.secondary.toUpperCase()] ??
+          (symbol === activeComparison.secondary.toUpperCase() ? analysis ?? undefined : undefined),
+      );
+    return { primaryScore: primary, secondaryScore: secondary };
+  }, [activeComparison, analysis, comparisonAnalyses, symbol]);
 
-  const handleSelectSymbol = (result: SymbolSearchResult) => {
-    setSelectedSymbol(result);
-    const existing = watchlistItems.find((item) => item.symbol.toUpperCase() === result.symbol.toUpperCase());
-    setSelectedStatus(existing?.status ?? WATCHLIST_STATUSES[0]);
-    loadSymbolAnalysis(result.symbol).catch(() => undefined);
+  const handleCompare = async () => {
+    const primary = comparisonInputs.primary.trim().toUpperCase();
+    const secondary = comparisonInputs.secondary.trim().toUpperCase();
+    if (!primary || !secondary) {
+      setComparisonError("Enter two symbols to compare.");
+      return;
+    }
+    if (primary === secondary) {
+      setComparisonError("Choose two different symbols to compare.");
+      return;
+    }
+    setLoadingComparison(true);
+    setComparisonError(null);
+    try {
+      await Promise.all([fetchComparisonAnalysis(primary), fetchComparisonAnalysis(secondary)]);
+      setActiveComparison({ primary, secondary });
+    } catch (err) {
+      setComparisonError(err instanceof Error ? err.message : "Unable to run comparison.");
+    } finally {
+      setLoadingComparison(false);
+    }
   };
 
-  const handleSave = (statusOverride?: WatchlistStatus) => {
-    if (!selectedSymbol || !analysis || finalScores.length === 0) return;
-    void onSave({
-      symbol: selectedSymbol.symbol,
-      status: statusOverride ?? selectedStatus,
-      finalScores,
-      averageScore,
-      aggregatedSignal: aggregatedSignals.at(-1) ?? null,
-    });
+  const handleComparisonChange = (field: "primary" | "secondary", value: string) => {
+    setComparisonInputs((prev) => ({ ...prev, [field]: value.toUpperCase() }));
+    setComparisonError(null);
   };
 
+  const handleSwapComparison = () => {
+    setComparisonInputs((prev) => ({ primary: prev.secondary, secondary: prev.primary }));
+    setComparisonError(null);
+  };
+
+  const symbolLabel = symbolMeta?.symbol ?? symbol ?? "";
+  const symbolName =
+    symbolMeta && symbolMeta.name && symbolMeta.name.toUpperCase() !== symbolMeta.symbol.toUpperCase()
+      ? symbolMeta.name
+      : null;
   return (
-    <div className="mx-auto w-full max-w-7xl gap-8 px-6 py-10 lg:grid lg:grid-cols-[360px,1fr]">
-      <aside className="lg:sticky lg:top-8 lg:self-start">
-        <SearchPanel
-          onSearch={performSearch}
-          results={searchResults}
-          onSelectSymbol={handleSelectSymbol}
-          loading={loadingSearch}
-          lastQuery={lastQuery}
-          activeSymbol={selectedSymbol?.symbol ?? null}
-        />
-      </aside>
-
-      <section className="mt-8 flex flex-col gap-6 lg:mt-0">
-        <div className="rounded-2xl border border-slate-200 bg-white px-6 py-5 shadow-sm shadow-slate-200/60">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div>
-              <h2 className="text-lg font-semibold text-slate-900">Signal Dashboard</h2>
-              <p className="text-sm text-slate-500">
-                Strategies loaded: {strategiesMeta.length} - Data source: Yahoo Finance + Alpha Vantage fundamentals
-              </p>
-              {sectorContext ? (
-                sectorContext.sampleSize > 0 ? (
-                  <p className="text-xs text-slate-400">
-                    Peer snapshot: {sectorContext.sector ?? "Unknown"} ·{" "}
-                    {sectorContext.universe === "russell"
-                      ? "Small-cap (Russell 2000)"
-                      : sectorContext.universe === "sp500"
-                        ? "Large-cap (S&P 500)"
-                        : "Tracked universe"}{" "}
-                    ({sectorContext.sampleSize} symbols)
-                  </p>
-                ) : (
-                  <p className="text-xs text-amber-500">
-                    Peer snapshot unavailable — update sector metadata for this universe to populate averages.
-                  </p>
-                )
-              ) : null}
-              {(macroOverlay || earningsQuality) ? (
-                <div className="mt-3 flex flex-wrap gap-2">
-                  {macroOverlay ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
-                      <span className="text-slate-500">Macro:</span>
-                      <span className="uppercase tracking-wide text-slate-700">{macroOverlay.regime.replace(/_/g, " ")}</span>
-                      <span className="text-slate-500">score {formatPercentValue(macroOverlay.score, 0)}</span>
-                      <span className="text-slate-500">{formatMultiplierValue(macroOverlay.multiplier)}</span>
-                    </span>
-                  ) : null}
-                  {earningsQuality ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
-                      <span>Earnings:</span>
-                      <span className="text-emerald-600">
-                        {earningsQuality.score != null ? formatPercentValue(earningsQuality.score, 0) : "—"}
-                      </span>
-                      {earningsQuality.positive_ratio != null ? (
-                        <span className="text-emerald-500">beats {formatPercentValue(earningsQuality.positive_ratio, 0)}</span>
-                      ) : null}
-                      {earningsQuality.surprise_average != null ? (
-                        <span className="text-emerald-500">surprise {formatPercentValue(earningsQuality.surprise_average, 1)}</span>
-                      ) : null}
-                      <span className="text-emerald-500">{formatMultiplierValue(earningsQuality.multiplier ?? null)}</span>
-                    </span>
-                  ) : null}
-                </div>
-              ) : null}
-            </div>
-            {selectedSymbol && (
-              <div className="flex flex-wrap items-center gap-3">
-                <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-slate-600">
-                  {selectedSymbol.symbol}
-                </span>
-                <button
-                  className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:opacity-90 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                  onClick={() => loadSymbolAnalysis(selectedSymbol.symbol)}
-                  disabled={loadingAnalysis}
-                >
-                  {loadingAnalysis ? "Refreshing..." : "Manual Refresh"}
-                </button>
-              </div>
-            )}
+    <div className="mx-auto w-full max-w-7xl space-y-8 px-6 pb-16 pt-10">
+      <header className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <div className="flex items-center gap-3">
+            <h1 className="text-3xl font-semibold text-slate-900">{symbolLabel}</h1>
+            <button
+              type="button"
+              onClick={() => navigate("/")}
+              className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-500 transition hover:border-blue-300 hover:text-blue-600"
+            >
+              Back to search
+            </button>
           </div>
-          <p className="mt-3 text-xs uppercase tracking-wide text-slate-400">
-            Interval: 1d - Lookback: 3 years - Hover charts or badges for interpretation cues
-          </p>
-        </div>
-
-        <div className="grid gap-4 xl:grid-cols-[1fr,320px]">
-          <div className="space-y-4">
-            <AggregatedSignals signals={aggregatedSignals} />
-            <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
-            <FinalScoreChart scores={finalScores} average={averageScore} />
-            {macroOverlay || earningsQuality ? (
-              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-200/60">
-                <h3 className="text-sm font-semibold text-slate-900">Macro &amp; Earnings Overlay</h3>
-                {macroOverlay ? (
-                  <div className="mt-3 text-xs text-slate-600">
-                    <p className="font-semibold text-slate-700">Macro regime</p>
-                    <p className="mt-1">
-                      <span className="uppercase tracking-wide text-slate-500">{macroOverlay.regime.replace(/_/g, " ")}</span>
-                      <span className="ml-2 text-slate-500">Score {formatPercentValue(macroOverlay.score, 0)}</span>
-                      <span className="ml-2 text-slate-500">{formatMultiplierValue(macroOverlay.multiplier)}</span>
-                    </p>
-                    {macroFactorEntries.length ? (
-                      <ul className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
-                        {macroFactorEntries.map(([name, rawValue]) => {
-                          const descriptor = getMacroDescriptor(name);
-                          const numericValue = typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null;
-                          const displayValue =
-                            numericValue !== null
-                              ? descriptor.format
-                                ? descriptor.format(numericValue)
-                                : Number(numericValue).toFixed(3)
-                              : "—";
-                          const tooltipContent = (
-                            <div className="space-y-1 text-left">
-                              <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
-                              <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
-                              <p className="text-[11px] text-slate-300">
-                                {numericValue !== null ? descriptor.compare(numericValue) : "No recent data."}
-                              </p>
-                            </div>
-                          );
-                          return (
-                            <li key={name} className="flex items-center justify-between gap-2 rounded-lg bg-white/80 px-2 py-1">
-                              <div className="flex items-center gap-1 text-slate-500">
-                                <span className="uppercase tracking-wide">{descriptor.label}</span>
-                                <Tooltip content={tooltipContent}>
-                                  <button
-                                    type="button"
-                                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
-                                    aria-label={`Learn more about ${descriptor.label}`}
-                                  >
-                                    <InfoIcon />
-                                  </button>
-                                </Tooltip>
-                              </div>
-                              <span className="font-medium text-slate-700">{displayValue}</span>
-                            </li>
-                          );
-                        })}
-                      </ul>
-                    ) : null}
-                  </div>
-                ) : null}
-                {earningsQuality ? (
-                  <div className="mt-3 text-xs text-slate-600">
-                    <p className="font-semibold text-slate-700">Earnings quality</p>
-                    {earningsMetricEntries.length ? (
-                      <div className="mt-1 flex flex-wrap gap-2">
-                        {earningsMetricEntries.map(({ key, value }) => {
-                          const descriptor = getEarningsDescriptor(key);
-                          const numericValue = typeof value === "number" && Number.isFinite(value) ? value : null;
-                          const displayValue =
-                            numericValue !== null
-                              ? descriptor.format
-                                ? descriptor.format(numericValue)
-                                : Number(numericValue).toFixed(3)
-                              : "—";
-                          const chipLabel = descriptor.chipLabel ?? descriptor.label;
-                          const chipClass =
-                            descriptor.chipClass ??
-                            defaultEarningsDescriptor.chipClass ??
-                            "rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700";
-                          const tooltipContent = (
-                            <div className="space-y-1 text-left">
-                              <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
-                              <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
-                              <p className="text-[11px] text-slate-300">
-                                {numericValue !== null ? descriptor.compare(numericValue) : "No recent data."}
-                              </p>
-                            </div>
-                          );
-                          return (
-                            <Tooltip key={key} content={tooltipContent}>
-                              <span className={chipClass}>
-                                {chipLabel} {displayValue}
-                              </span>
-                            </Tooltip>
-                          );
-                        })}
-                      </div>
-                    ) : null}
-                  </div>
-                ) : null}
-              </div>
-            ) : null}
-          </div>
-          <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
-            <h3 className="text-sm font-semibold text-slate-900">Save to watchlist</h3>
-            <p className="mt-2 text-xs text-slate-500">
-              Tag the symbol with a status and capture the latest score snapshot for future review.
+          {symbolName ? <p className="text-xs text-slate-500">{symbolName}</p> : null}
+          {sectorContext ? (
+            <p className="mt-1 text-xs text-slate-500">
+              Sector snapshot: {sectorContext.sector ?? "Unknown"} -{" "}
+              {sectorContext.universe === "russell"
+                ? "Small-cap (Russell 2000)"
+                : sectorContext.universe === "sp500"
+                ? "Large-cap (S&P 500)"
+                : "Tracked universe"}{" "}
+              ({sectorContext.sampleSize} symbols)
             </p>
-            <div className="mt-4 space-y-3">
-              <select
-                value={selectedStatus}
-                onChange={(event) => setSelectedStatus(event.target.value as WatchlistStatus)}
-                className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-inner shadow-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
-              >
-                {WATCHLIST_STATUSES.map((status) => (
-                  <option key={status} value={status}>
-                    {status}
-                  </option>
-                ))}
-              </select>
-              <button
-                type="button"
-                disabled={!selectedSymbol || !analysis || finalScores.length === 0}
-                onClick={() => handleSave()}
-                className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
-              >
-                Save symbol snapshot
-              </button>
-            </div>
-          </div>
+          ) : (
+            <p className="mt-1 text-xs text-slate-500">Sector snapshot unavailable.</p>
+          )}
         </div>
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-widest text-slate-600">
+            {sectorContext?.universe === "sp500" ? "Large Cap" : "Small Cap"}
+          </span>
+          <span className="inline-flex items-center rounded-full border border-slate-200 bg-slate-50 px-4 py-1 text-xs font-semibold uppercase tracking-wide text-slate-600">
+            Strategies: {strategiesMeta.length}
+          </span>
+        </div>
+      </header>
 
-        <SignalComparisonPanel
-          inputs={comparisonInputs}
-          onInputChange={handleComparisonInputChange}
-          onSwap={handleSwapComparison}
-          onCompare={handleCompareSymbols}
-          loading={loadingComparison}
-          error={comparisonError}
-          rows={comparisonRows}
-          summary={comparisonSummary}
-          activePair={activeComparison}
-          strategyOrder={strategiesMeta}
-        />
+      {error ? (
+        <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
+          <strong className="font-semibold">Analysis error:</strong> {error}
+        </div>
+      ) : null}
 
-        {error && (
-          <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
-            <strong className="font-semibold">API message:</strong> {error}
-          </div>
-        )}
+      {loadingAnalysis && (
+        <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-5 text-sm text-blue-700 shadow-sm shadow-blue-200/40">
+          Fetching the latest prices, fundamentals, and strategy signals...
+        </div>
+      )}
 
-        {analysis && (
-          <>
+      {!loadingAnalysis && !analysis ? (
+        <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/60">
+          Unable to load analysis for this symbol. Try again from the search page.
+        </div>
+      ) : null}
+
+      {analysis ? (
+        <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
+          <div className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+              <div className="flex flex-wrap items-center justify-between gap-4">
+                <div>
+                  <h2 className="text-lg font-semibold text-slate-900">Signal overview</h2>
+                  <p className="text-xs text-slate-500">
+                    Aggregated signal blends CAN SLIM, Dan Zanger, trend-following, and Livermore confidence scores.
+                  </p>
+                </div>
+                <div className="text-right">
+                  <span className="text-xs uppercase tracking-wide text-slate-400">Latest aggregated</span>
+                  <p className="text-xl font-semibold text-slate-900">
+                    {latestAggregated ? formatPercent(Math.max(0, Math.min(latestAggregated.confidence, 1)), 0) : "--"}
+                  </p>
+                </div>
+              </div>
+              <div className="mt-4 grid gap-4 md:grid-cols-[1.4fr,1fr]">
+                <FinalScoreChart scores={finalScores} average={averageScore} />
+                <AggregatedSignals signals={aggregatedSignals} />
+              </div>
+            </div>
+
+            <div className="grid gap-6 lg:grid-cols-2">
+              <FundamentalsCard fundamentals={fundamentalsSnapshot} />
+              <MacroEarningsCard
+                macroOverlay={macroOverlay}
+                macroFactorEntries={macroFactorEntries}
+                earningsQuality={earningsQuality}
+              />
+            </div>
+
+            <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
             <PriceChart data={analysis.price_bars} annotations={annotations} latestAggregated={latestAggregated} />
+
             <div className="grid gap-6 md:grid-cols-2">
               {strategyCards.map((strategy) => (
                 <StrategyCard
@@ -850,51 +606,207 @@ function DashboardPage({
                 />
               ))}
             </div>
-          </>
-        )}
 
-        {!analysis && !loadingAnalysis && (
-          <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-10 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/60">
-            Select a symbol from the left to view cross-strategy insights.
+            <SignalComparisonPanel
+              inputs={comparisonInputs}
+              onInputChange={handleComparisonChange}
+              onSwap={handleSwapComparison}
+              onCompare={handleCompare}
+              loading={loadingComparison}
+              error={comparisonError}
+              rows={comparisonRows}
+              summary={comparisonSummary}
+              activePair={activeComparison}
+              strategyOrder={strategiesMeta}
+            />
           </div>
-        )}
 
-        {loadingAnalysis && (
-          <div className="rounded-2xl border border-blue-200 bg-blue-50 px-6 py-5 text-sm text-blue-700 shadow-sm shadow-blue-200/40">
-            Fetching the latest prices and strategy signals...
-          </div>
-        )}
-      </section>
+          <aside className="space-y-6">
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+              <h3 className="text-sm font-semibold text-slate-900">Save to watchlist</h3>
+              <p className="mt-2 text-xs text-slate-500">
+                Capture this signal snapshot for future review and watchlist alerts.
+              </p>
+              <div className="mt-4 space-y-3">
+                <select
+                  value={selectedStatus}
+                  onChange={(event) => setSelectedStatus(event.target.value as WatchlistStatus)}
+                  className="w-full rounded-xl border border-slate-200 px-3 py-2 text-sm shadow-inner shadow-slate-100 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+                >
+                  {WATCHLIST_STATUSES.map((status) => (
+                    <option key={status} value={status}>
+                      {status}
+                    </option>
+                  ))}
+                </select>
+                <button
+                  type="button"
+                  onClick={() => handleSave()}
+                  disabled={finalScores.length === 0}
+                  className="inline-flex w-full items-center justify-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20 transition hover:opacity-90 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  Save symbol snapshot
+                </button>
+              </div>
+            </div>
+
+            <div className="rounded-2xl border border-slate-200 bg-white p-6 text-sm text-slate-600 shadow-sm shadow-slate-200/60">
+              <h3 className="text-sm font-semibold text-slate-900">Next steps</h3>
+              <ul className="mt-3 space-y-2 text-xs">
+                <li>Review scenario callouts for tactical actions aligned with the latest signal.</li>
+                <li>Use the comparison tool to benchmark this ticker against a peer.</li>
+                <li>Jump back to the search page to explore additional prospects.</li>
+              </ul>
+            </div>
+          </aside>
+        </div>
+      ) : null}
     </div>
   );
 }
+type MacroEarningsCardProps = {
+  macroOverlay: SymbolAnalysis["macro_overlay"] | null | undefined;
+  macroFactorEntries: Array<[string, number]>;
+  earningsQuality: SymbolAnalysis["earnings_quality"] | null | undefined;
+};
 
-function NotFoundPage() {
+function MacroEarningsCard({
+  macroOverlay,
+  macroFactorEntries,
+  earningsQuality,
+}: MacroEarningsCardProps) {
+  const earningsMetrics = useMemo(
+    () =>
+      earningsQuality
+        ? [
+            { key: "score", value: earningsQuality.score ?? null },
+            { key: "multiplier", value: earningsQuality.multiplier ?? null },
+            { key: "positive_ratio", value: earningsQuality.positive_ratio ?? null },
+            { key: "surprise_average", value: earningsQuality.surprise_average ?? null },
+            { key: "eps_trend", value: earningsQuality.eps_trend ?? null },
+          ]
+        : [],
+    [earningsQuality],
+  );
+
   return (
-    <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center gap-4 px-4 text-center">
-      <h1 className="text-3xl font-semibold text-slate-900">Page not found</h1>
-      <p className="text-sm text-slate-500">
-        The page you were looking for does not exist. Use the navigation above to return to the dashboard or browse the guides.
-      </p>
-      <NavLink
-        to="/"
-        className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20"
-      >
-        Back to dashboard
-      </NavLink>
-    </div>
+    <article className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+      <h3 className="text-sm font-semibold text-slate-900">Macro & Earnings Context</h3>
+      {macroOverlay ? (
+        <div className="space-y-2 text-xs text-slate-600">
+          <div className="flex items-center justify-between">
+            <div>
+              <p className="font-semibold text-slate-700">Macro regime</p>
+              <p className="text-[11px] text-slate-500">{macroOverlay.notes ?? "Macro overlay score derived from VIX, credit spreads, and SPY trend."}</p>
+            </div>
+            <div className="text-right">
+              <p className="text-sm font-semibold text-slate-900">{macroOverlay.regime.replace(/_/g, " ")}</p>
+              <p className="text-xs text-slate-500">
+                Score {formatPercent(macroOverlay.score, 0)} - {formatMultiplier(macroOverlay.multiplier)}
+              </p>
+            </div>
+          </div>
+          {macroFactorEntries.length ? (
+            <ul className="mt-2 grid gap-2 sm:grid-cols-2">
+              {macroFactorEntries.map(([name, rawValue]) => {
+                const descriptor = getMacroDescriptor(name);
+                const numericValue = typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null;
+                const display =
+                  numericValue !== null
+                    ? descriptor.format
+                      ? descriptor.format(numericValue)
+                      : numericValue.toFixed(3)
+                    : "--";
+                const tooltipContent = (
+                  <div className="space-y-1 text-left">
+                    <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
+                    <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
+                    <p className="text-[11px] text-slate-300">
+                      {numericValue !== null ? descriptor.compare(numericValue) : "No recent readings."}
+                    </p>
+                  </div>
+                );
+                return (
+                  <li key={name} className="flex items-center justify-between gap-2 rounded-lg border border-slate-100 bg-slate-50/70 px-2 py-2">
+                    <div className="flex items-center gap-1 text-xs font-medium text-slate-500">
+                      <span className="uppercase tracking-wide text-slate-400">{descriptor.label}</span>
+                      <Tooltip content={tooltipContent}>
+                        <button
+                          type="button"
+                          className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
+                          aria-label={`More information about ${descriptor.label}`}
+                        >
+                          <InfoIcon />
+                        </button>
+                      </Tooltip>
+                    </div>
+                    <span className="text-sm font-semibold text-slate-800">{display}</span>
+                  </li>
+                );
+              })}
+            </ul>
+          ) : null}
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">Macro overlay unavailable.</p>
+      )}
+
+      {earningsMetrics.length ? (
+        <div className="border-t border-slate-100 pt-3 text-xs text-slate-600">
+          <p className="font-semibold text-slate-700">Earnings quality</p>
+          <div className="mt-2 flex flex-wrap gap-2">
+            {earningsMetrics.map(({ key, value }) => {
+              const descriptor = getEarningsDescriptor(key);
+              const numericValue = typeof value === "number" && Number.isFinite(value) ? value : null;
+              const display =
+                numericValue !== null
+                  ? descriptor.format
+                    ? descriptor.format(numericValue)
+                    : numericValue.toFixed(3)
+                  : "--";
+              const tooltipContent = (
+                <div className="space-y-1 text-left">
+                  <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
+                  <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
+                  <p className="text-[11px] text-slate-300">
+                    {numericValue !== null ? descriptor.compare(numericValue) : "No recent readings."}
+                  </p>
+                </div>
+              );
+              return (
+                <Tooltip key={key} content={tooltipContent}>
+                  <span className={descriptor.chipClass ?? DEFAULT_EARNINGS_DESCRIPTOR.chipClass ?? ""}>
+                    {(descriptor.chipLabel ?? descriptor.label) + ": " + display}
+                  </span>
+                </Tooltip>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <p className="text-xs text-slate-500">No earnings quality metrics available.</p>
+      )}
+    </article>
   );
 }
-
 const navLinks = [
-  { label: "Dashboard", to: "/" },
-  { label: "Signal Guides", to: "/guides/signals" },
+  { label: "Search", to: "/" },
+  { label: "Watchlist", to: "/watchlist" },
   { label: "Russell Momentum", to: "/russell/momentum" },
   { label: "S&P Momentum", to: "/sp500/momentum" },
+  { label: "Signal Guides", to: "/guides/signals" },
   { label: "Glossary", to: "/guides/glossary" },
-  { label: "Watchlist", to: "/watchlist" },
   { label: "Strategy Health", to: "/diagnostics/strategy-weights" },
 ];
+
+type AppLayoutProps = {
+  strategies: StrategyInfo[];
+  watchlistItems: SavedSignal[];
+  handleSaveWatchlist: (payload: SavePayload) => void;
+  handleQuickWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
+  removeFromWatchlist: (id: string) => Promise<void>;
+  strategyWeights: Record<string, number>;
+};
 
 function AppLayout({
   strategies,
@@ -903,25 +815,16 @@ function AppLayout({
   handleQuickWatchlist,
   removeFromWatchlist,
   strategyWeights,
-}: {
-  strategies: StrategyInfo[];
-  watchlistItems: SavedSignal[];
-  handleSaveWatchlist: (payload: SavePayload) => void;
-  handleQuickWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
-  removeFromWatchlist: (id: string) => Promise<void>;
-  strategyWeights: Record<string, number>;
-}) {
+}: AppLayoutProps) {
   return (
     <div className="min-h-screen bg-slate-50">
-      <header className="bg-slate-900 px-6 pb-5 pt-8 text-white shadow-lg shadow-slate-900/40">
-        <div className="mx-auto flex w-full max-w-7xl flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <div>
-              <h1 className="text-3xl font-semibold tracking-tight sm:text-4xl">Small-Cap Growth Dashboard</h1>
-              <p className="mt-2 text-sm text-slate-300">
-                Track CAN SLIM, Dan Zanger, trend-following, and Livermore patterns with actionable, explainable signals.
-              </p>
-            </div>
+      <header className="border-b border-slate-200 bg-slate-900 text-white">
+        <div className="mx-auto flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Small-Cap Growth Toolkit</h1>
+            <p className="text-xs text-slate-300">
+              Search, analyse, and monitor actionable signals across CAN SLIM, Zanger, trend-following, and Livermore models.
+            </p>
           </div>
           <nav className="flex flex-wrap gap-2 text-sm font-medium">
             {navLinks.map((link) => (
@@ -930,7 +833,8 @@ function AppLayout({
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
-                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
+                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
+                    isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
                   }`
                 }
               >
@@ -942,10 +846,11 @@ function AppLayout({
       </header>
 
       <Routes>
+        <Route path="/" element={<SearchPage watchlistItems={watchlistItems} />} />
         <Route
-          path="/"
+          path="/symbols/:symbol"
           element={
-            <DashboardPage
+            <SymbolDashboardPage
               strategiesMeta={strategies}
               onSave={handleSaveWatchlist}
               watchlistItems={watchlistItems}
@@ -953,7 +858,6 @@ function AppLayout({
             />
           }
         />
-        <Route path="/guides/signals" element={<SignalGuide />} />
         <Route
           path="/russell/momentum"
           element={
@@ -972,11 +876,29 @@ function AppLayout({
             />
           }
         />
-        <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/watchlist" element={<WatchlistPage items={watchlistItems} remove={removeFromWatchlist} />} />
+        <Route path="/guides/signals" element={<SignalGuide />} />
+        <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/diagnostics/strategy-weights" element={<StrategyWeightsPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
+    </div>
+  );
+}
+
+function NotFoundPage() {
+  return (
+    <div className="mx-auto flex min-h-[50vh] w-full max-w-2xl flex-col items-center justify-center gap-4 px-6 text-center">
+      <h1 className="text-3xl font-semibold text-slate-900">Page not found</h1>
+      <p className="text-sm text-slate-500">
+        The page you were looking for does not exist. Use the navigation above to return to search or browse guides.
+      </p>
+      <NavLink
+        to="/"
+        className="inline-flex items-center rounded-full bg-gradient-to-r from-blue-600 to-violet-600 px-4 py-2 text-sm font-semibold text-white shadow-lg shadow-blue-600/20"
+      >
+        Back to search
+      </NavLink>
     </div>
   );
 }
@@ -989,13 +911,9 @@ export default function App() {
   const strategyWeights = useMemo(() => {
     const latest = new Map<string, { weight: number; updatedAt: number }>();
     strategyMetrics.forEach((entry) => {
-      if (entry.reliability_weight === null || entry.reliability_weight === undefined) {
-        return;
-      }
+      if (entry.reliability_weight === null || entry.reliability_weight === undefined) return;
       const updatedAt = new Date(entry.updated_at).getTime();
-      if (Number.isNaN(updatedAt)) {
-        return;
-      }
+      if (Number.isNaN(updatedAt)) return;
       const existing = latest.get(entry.strategy.id);
       if (!existing || updatedAt > existing.updatedAt) {
         latest.set(entry.strategy.id, { weight: entry.reliability_weight, updatedAt });
@@ -1044,6 +962,3 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
-
-

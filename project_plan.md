@@ -3,7 +3,7 @@
 ## System Reconstruction Blueprint
 
 ### Business Objective
-Deliver a weekly-use research assistant for novice-to-intermediate small-cap investors. The system ingests Yahoo Finance price data and Alpha Vantage fundamentals, applies curated growth strategies (CAN SLIM, Dan Zanger cup-handle, EMA trend following, Livermore breakout), scores opportunities, simulates backtests, and presents actionable dashboards plus education so users understand each signal. Saved watchlist entries track conviction level, status, and score breakdown for ongoing monitoring.
+Deliver a weekly-use research assistant for novice-to-intermediate small-cap investors. The system ingests Yahoo Finance price data and Alpha Vantage fundamentals, normalises those inputs into a composite fundamentals score, applies curated growth strategies (CAN SLIM, Dan Zanger cup-handle, EMA trend following, Livermore breakout), scores opportunities, simulates backtests, and presents actionable dashboards plus education so users understand each signal. A dedicated search hub routes into symbol dashboards so users can explore fundamentals, macro overlays, and strategy outputs. Saved watchlist entries track conviction level, status, and score breakdown for ongoing monitoring.
 
 ### Implementation Steps
 1. Establish Python 3.11 environment with FastAPI, Uvicorn, pandas, yfinance, requests, numpy, and pytest per `requirements.txt`. Ensure storage directories align with `config/default_settings.json` (price cache, universe snapshots, signals, portfolio).
@@ -142,6 +142,13 @@ Deliver a weekly-use research assistant for novice-to-intermediate small-cap inv
 - [x] ~~Add S&P 500 momentum service and dashboard parity with Russell flows. (Completed: 2025-10-07)~~
 - [x] ~~Expose sortable strategy/final scores on momentum tables. (Completed: 2025-10-07)~~
 - [x] ~~Surface strategy tooltips with investment bounds on analysis cards. (Completed: 2025-10-07)~~
+
+## Fundamentals Scoring
+- [x] ~~Back-end enrichment: extend the fundamentals pipeline to pull Alpha Vantage overview + earnings data, normalise values (P/E, dividend yield, EBITDA, etc.), compute a fundamentals score, and expose it via the existing SymbolAnalysisResponse. (Completed: 2025-10-12)~~
+- [x] ~~API schema & tests: add payload types for the new fundamentals snapshot, update services.py, and adjust unit tests to cover the extra schema/data. (Completed: 2025-10-12)~~
+- [x] ~~UI restructuring: split the app into two routes (/ for search, /symbols/:ticker for the dashboard), update navigation (watchlist, momentum pages, etc.), and reshape the symbol dashboard layout so macro/earnings/fundamentals cards sit in a clear grid. (Completed: 2025-10-12)~~
+- [x] ~~Fundamentals card: create a dedicated card component with metric tooltips (ideal range + interpretation) feeding off the new API field. (Completed: 2025-10-12)~~
+- [x] ~~Regression pass: adjust TypeScript types/hooks, wire up tooltips, ensure watchlist save, comparison, and momentum quick-links still work, and run the web/npm + pytest suites. (Completed: 2025-10-12)~~
 
 ## Future Analytics Backlog
 - Volatility-adjusted sizing and position throttling to complement trend overlays.

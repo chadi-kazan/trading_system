@@ -34,6 +34,7 @@ type IndexMomentumPageProps = {
   watchlistItems: SavedSignal[];
   onSaveWatchlist: (symbol: string, status: WatchlistStatus) => Promise<unknown>;
   indexKey: string;
+  onAnalyze?: (symbol: string) => void;
 };
 
 function formatPercent(value: number | null | undefined, digits = 2): string {
@@ -82,6 +83,7 @@ export function IndexMomentumPage({
   watchlistItems,
   onSaveWatchlist,
   indexKey,
+  onAnalyze,
 }: IndexMomentumPageProps): JSX.Element {
   const navigate = useNavigate();
   const [timeframe, setTimeframe] = useState<MomentumTimeframe>("week");
@@ -284,7 +286,7 @@ export function IndexMomentumPage({
 
   const handleAnalyzeSymbol = (symbol: string) => {
     const status = getSelectedStatus(symbol);
-    navigate("/", { state: { symbol: symbol.toUpperCase(), status } });
+    navigate(`/symbols/${symbol.toUpperCase()}`, { state: { status } });
   };
 
   const handleSortSelectChange = (event: ChangeEvent<HTMLSelectElement>) => {

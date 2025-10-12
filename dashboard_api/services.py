@@ -77,8 +77,6 @@ class SignalService:
             )
         )
         self._regime_analyzer = MarketRegimeAnalyzer(self.price_provider)
-        self._latest_fundamentals: Dict[str, Dict[str, Any]] = {}
-        self._regime_analyzer = MarketRegimeAnalyzer(self.price_provider)
 
         api_key = self.config.data_sources.alpha_vantage_key
         self.alpha_client: Optional[AlphaVantageClient]
@@ -236,6 +234,8 @@ class SignalService:
         ]
 
         prices = [self._to_price_bar(idx, row) for idx, row in enriched.iterrows()]
+        latest_price_value = prices[-1].close if prices else None
+        fundamentals_snapshot = self._build_fundamentals_payload(fundamentals, latest_price_value)
 
         analysis = SymbolAnalysisResponse(
             symbol=cleaned_symbol,
@@ -247,6 +247,7 @@ class SignalService:
             aggregated_signals=aggregated_signals,
             macro_overlay=self._build_macro_payload(macro_snapshot),
             earnings_quality=self._build_earnings_payload(earnings_signal),
+            fundamentals=fundamentals_snapshot,
         )
         self._store_analysis(cache_key, analysis)
         return analysis
@@ -357,6 +358,215 @@ class SignalService:
         payload["multiplier"] = payload.pop("confidence_multiplier")
         return payload
 
+    def _build_fundamentals_payload(
+        self,
+        fundamentals: Dict[str, Any],
+        latest_price: Optional[float],
+    ) -> Optional[Dict[str, Any]]:
+        if not fundamentals and latest_price is None:
+            return None
+
+        def clamp(value: float, minimum: float = 0.0, maximum: float = 1.0) -> float:
+            return max(minimum, min(maximum, value))
+
+        metrics: List[Dict[str, Any]] = []
+        score_components: List[float] = []
+        fetched_at = fundamentals.get("_fetched_at")
+
+        def add_metric(
+            key: str,
+            label: str,
+            ideal: str,
+            raw_value: Any,
+            formatter=None,
+            interpreter=None,
+        ) -> None:
+            numeric: Optional[float] = None
+            display = "—"
+            interpretation = None
+            if raw_value is not None:
+                try:
+                    numeric = float(raw_value)
+                except (TypeError, ValueError):
+                    numeric = None
+                if numeric is not None:
+                    try:
+                        display = formatter(numeric) if formatter else f"{numeric:.3f}"
+                    except Exception:  # pragma: no cover - defensive
+                        display = f"{numeric:.3f}"
+                    interpretation = interpreter(numeric) if interpreter else None
+                else:
+                    display = str(raw_value)
+            metrics.append(
+                {
+                    "key": key,
+                    "label": label,
+                    "value": numeric,
+                    "display": display,
+                    "ideal": ideal,
+                    "interpretation": interpretation,
+                }
+            )
+
+        if latest_price is not None:
+            add_metric(
+                "price",
+                "Price",
+                "Confirm trend vs 50/200 day averages",
+                latest_price,
+                self._format_currency_value,
+                lambda _: "Latest closing price.",
+            )
+
+        market_cap = fundamentals.get("market_cap")
+        add_metric(
+            "market_cap",
+            "Market Cap",
+            "> $100M (liquidity threshold)",
+            market_cap,
+            self._format_large_currency,
+            lambda value: "Mega-cap scale." if value and value >= 1e11 else "Within small/mid-cap focus.",
+        )
+
+        pe_ratio = fundamentals.get("pe_ratio")
+        add_metric(
+            "pe_ratio",
+            "P/E Ratio",
+            "10-25 for growth names",
+            pe_ratio,
+            lambda v: f"{v:.1f}",
+            lambda v: "Growth-aligned valuation." if v and v <= 25 else ("Rich multiple; confirm thesis." if v and v <= 50 else "Extremely rich valuation."),
+        )
+        if pe_ratio is not None and pe_ratio > 0:
+            score_components.append(clamp((40.0 - float(pe_ratio)) / 30.0))
+
+        peg_ratio = fundamentals.get("peg_ratio")
+        add_metric(
+            "peg_ratio",
+            "PEG Ratio",
+            "≤ 1.5 indicates reasonable price for growth",
+            peg_ratio,
+            lambda v: f"{v:.2f}",
+            lambda v: "Growth priced fairly." if v and v <= 1.5 else ("Monitor valuation premium." if v and v <= 2.5 else "High growth premium."),
+        )
+
+        eps = fundamentals.get("eps")
+        add_metric(
+            "eps",
+            "EPS (TTM)",
+            "Positive and expanding",
+            eps,
+            lambda v: f"{v:.2f}",
+            lambda v: "Positive earnings base." if v and v > 0 else "Negative EPS; evaluate turnaround evidence.",
+        )
+
+        ebitda = fundamentals.get("ebitda")
+        add_metric(
+            "ebitda",
+            "EBITDA (TTM)",
+            "Growing year over year",
+            ebitda,
+            self._format_large_currency,
+            lambda v: "Healthy operating cash flow." if v and v > 0 else "Negative EBITDA; monitor liquidity.",
+        )
+
+        revenue = fundamentals.get("revenue_ttm")
+        add_metric(
+            "revenue_ttm",
+            "Revenue (TTM)",
+            "Consistent expansion",
+            revenue,
+            self._format_large_currency,
+            lambda v: "Meaningful revenue base." if v and v > 0 else "Limited revenue data.",
+        )
+
+        dividend_yield = fundamentals.get("dividend_yield")
+        add_metric(
+            "dividend_yield",
+            "Dividend Yield",
+            "0% - 4% (higher for income)",
+            dividend_yield,
+            lambda v: self._format_percentage_value(v, 1),
+            lambda v: "Income support in play." if v and v >= 0.02 else "Growth-oriented, low yield.",
+        )
+        if dividend_yield is not None:
+            score_components.append(clamp(float(dividend_yield) / 0.04))
+
+        profit_margin = fundamentals.get("profit_margin")
+        add_metric(
+            "profit_margin",
+            "Profit Margin",
+            "> 10% for quality names",
+            profit_margin,
+            lambda v: self._format_percentage_value(v, 1),
+            lambda v: "Robust profitability." if v and v >= 0.12 else ("Moderate margin." if v and v >= 0.05 else "Thin or negative margin."),
+        )
+        if profit_margin is not None:
+            score_components.append(clamp((float(profit_margin) + 0.05) / 0.25))
+
+        operating_margin = fundamentals.get("operating_margin")
+        add_metric(
+            "operating_margin",
+            "Operating Margin",
+            "> 12% sustained",
+            operating_margin,
+            lambda v: self._format_percentage_value(v, 1),
+            lambda v: "Efficient operations." if v and v >= 0.12 else ("Monitor efficiency trends." if v and v >= 0.05 else "Operating pressure present."),
+        )
+
+        roe = fundamentals.get("return_on_equity")
+        add_metric(
+            "return_on_equity",
+            "Return on Equity",
+            "> 15% indicates quality",
+            roe,
+            lambda v: self._format_percentage_value(v, 1),
+            lambda v: "Excellent capital returns." if v and v >= 0.15 else ("Acceptable ROE." if v and v >= 0.08 else "Subpar ROE; investigate drivers."),
+        )
+        if roe is not None:
+            score_components.append(clamp(float(roe) / 0.25))
+
+        debt_to_equity = fundamentals.get("debt_to_equity")
+        add_metric(
+            "debt_to_equity",
+            "Debt/Equity",
+            "≤ 1.0 for flexibility",
+            debt_to_equity,
+            lambda v: f"{v:.2f}",
+            lambda v: "Low leverage." if v and v <= 0.6 else ("Moderate leverage." if v and v <= 1.2 else "High leverage; monitor balance sheet."),
+        )
+        if debt_to_equity is not None:
+            score_components.append(clamp((1.5 - float(debt_to_equity)) / 1.5))
+
+        earnings_growth = fundamentals.get("earnings_growth")
+        add_metric(
+            "earnings_growth",
+            "Earnings Growth YoY",
+            "> 15% for growth focus",
+            earnings_growth,
+            lambda v: self._format_percentage_value(v, 1),
+            lambda v: "Strong growth momentum." if v and v >= 0.15 else ("Mixed growth." if v and v >= 0.0 else "Earnings contraction."),
+        )
+        if earnings_growth is not None:
+            score_components.append(clamp((float(earnings_growth) + 0.20) / 0.6))
+
+        score: Optional[float] = None
+        if score_components:
+            score = sum(score_components) / len(score_components)
+
+        snapshot: Dict[str, Any] = {
+            "metrics": metrics,
+            "notes": "Score blends valuation, profitability, growth, and yield markers.",
+        }
+        if score is not None:
+            snapshot["score"] = round(float(score), 3)
+
+        parsed_timestamp = self._parse_datetime_safe(fetched_at)
+        if parsed_timestamp is not None:
+            snapshot["updated_at"] = parsed_timestamp
+
+        return snapshot
+
     def _analysis_cache_key(
         self,
         symbol: str,
@@ -399,6 +609,40 @@ class SignalService:
             slow_ema=_maybe_float(data.get("slow_ema")),
             atr=_maybe_float(data.get("atr")),
         )
+
+    @staticmethod
+    def _format_currency_value(value: float) -> str:
+        return f"${value:,.2f}"
+
+    @staticmethod
+    def _format_large_currency(value: float) -> str:
+        if value is None:
+            return "—"
+        abs_value = abs(value)
+        if abs_value >= 1_000_000_000_000:
+            return f"${value / 1_000_000_000_000:.2f}T"
+        if abs_value >= 1_000_000_000:
+            return f"${value / 1_000_000_000:.2f}B"
+        if abs_value >= 1_000_000:
+            return f"${value / 1_000_000:.2f}M"
+        if abs_value >= 1_000:
+            return f"${value / 1_000:.2f}K"
+        return f"${value:,.0f}"
+
+    @staticmethod
+    def _format_percentage_value(value: float, digits: int = 1) -> str:
+        return f"{value * 100:.{digits}f}%"
+
+    @staticmethod
+    def _parse_datetime_safe(value: Any) -> Optional[datetime]:
+        if value is None:
+            return None
+        if isinstance(value, datetime):
+            return value
+        try:
+            return datetime.fromisoformat(str(value))
+        except Exception:  # pragma: no cover - defensive
+            return None
 
 
 class BaseMomentumService:
@@ -597,8 +841,8 @@ class BaseMomentumService:
         if reference_price is None or reference_price <= 0:
             return None
 
-        enriched = self._prepare_enriched_frame(symbol, frame)
-        strategy_scores, final_score, overlays = self._score_symbol(symbol, enriched)
+        enriched, fundamentals = self._prepare_enriched_frame(symbol, frame)
+        strategy_scores, final_score, overlays = self._score_symbol(symbol, enriched, fundamentals)
 
         latest_row = frame.iloc[-1]
         last_close = _safe_float(latest_row.get("close"))
@@ -634,7 +878,7 @@ class BaseMomentumService:
             overlays=overlays,
         )
 
-    def _prepare_enriched_frame(self, symbol: str, frame: pd.DataFrame) -> pd.DataFrame:
+    def _prepare_enriched_frame(self, symbol: str, frame: pd.DataFrame) -> Tuple[pd.DataFrame, Dict[str, Any]]:
         fundamentals: Dict[str, Any] = {}
         try:
             fundamentals = load_fundamental_metrics(
@@ -645,18 +889,14 @@ class BaseMomentumService:
         except Exception as exc:  # pragma: no cover - defensive logging
             LOGGER.debug("Fundamentals lookup failed for %s: %s", symbol, exc)
 
-        if fundamentals:
-            self._latest_fundamentals[symbol.upper()] = fundamentals
-        else:
-            self._latest_fundamentals.pop(symbol.upper(), None)
-
         enriched = enrich_price_frame(symbol, frame, fundamentals=fundamentals)
-        return _ensure_additional_indicators(self._strategy_map, enriched)
+        return _ensure_additional_indicators(self._strategy_map, enriched), fundamentals
 
     def _score_symbol(
         self,
         symbol: str,
         enriched: pd.DataFrame,
+        fundamentals: Dict[str, Any],
     ) -> Tuple[Dict[str, float], Optional[float], Dict[str, Optional[float]]]:
         scores: Dict[str, float] = {}
         collected: List[StrategySignal] = []
@@ -679,7 +919,6 @@ class BaseMomentumService:
 
         aggregated = list(self.aggregator.aggregate(collected))
         macro_snapshot = self._regime_analyzer.current()
-        fundamentals = self._latest_fundamentals.get(symbol.upper(), {})
         earnings_signal = compute_earnings_signal(fundamentals)
         overlays = {
             "macro_multiplier": macro_snapshot.multiplier,

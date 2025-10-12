@@ -8,6 +8,7 @@ import pytest
 from data_pipeline import fundamentals
 from data_pipeline.fundamentals import load_fundamental_metrics
 from analytics import compute_earnings_signal
+from dashboard_api.services import SignalService
 
 
 def test_load_fundamental_metrics_from_json(tmp_path: Path):
@@ -33,6 +34,11 @@ def test_load_fundamental_metrics_from_csv(tmp_path: Path):
     assert metrics == {"earnings_growth": 0.2, "relative_strength": 0.4}
 
 
+def test_to_float_parses_percentages():
+    assert fundamentals._to_float("12.5%") == pytest.approx(0.125)
+    assert fundamentals._to_float("  ") is None
+
+
 def test_load_fundamental_metrics_alpha_vantage(monkeypatch: pytest.MonkeyPatch, tmp_path: Path):
     class DummyClient:
         def __init__(self, api_key: str) -> None:  # pragma: no cover - simple init
@@ -45,15 +51,50 @@ def test_load_fundamental_metrics_alpha_vantage(monkeypatch: pytest.MonkeyPatch,
                 "52WeekLow": "80",
                 "50DayMovingAverage": "100",
                 "MarketCapitalization": "123456789",
+                "PERatio": "18.0",
+                "PEGRatio": "1.40",
+                "EPS": "2.75",
+                "EBITDA": "123000000",
+                "DividendYield": "1.2%",
+                "RevenueTTM": "450000000",
+                "ProfitMargin": "0.18",
+                "OperatingMarginTTM": "0.22",
+                "ReturnOnEquityTTM": "0.16",
+                "DebtToEquityRatio": "0.55",
+            }
+
+        def fetch_earnings(self, symbol: str):
+            return {
+                "quarterlyEarnings": [
+                    {"reportedEPS": "1.20", "estimatedEPS": "1.00"},
+                    {"reportedEPS": "1.05", "estimatedEPS": "0.98"},
+                    {"reportedEPS": "0.90", "estimatedEPS": "1.02"},
+                    {"reportedEPS": "0.85", "estimatedEPS": "0.80"},
+                ]
             }
 
     monkeypatch.setattr(fundamentals, "AlphaVantageClient", DummyClient)
 
     metrics = load_fundamental_metrics("abc", tmp_path, api_key="demo")
 
+    fetched_at = metrics.pop("_fetched_at", None)
+    assert fetched_at is not None
     assert metrics["earnings_growth"] == 0.35
     assert metrics["relative_strength"] == pytest.approx(0.5)
-    assert metrics["market_cap"] == 123456789.0
+    assert metrics["market_cap"] == pytest.approx(123456789.0)
+    assert metrics["pe_ratio"] == pytest.approx(18.0)
+    assert metrics["peg_ratio"] == pytest.approx(1.40)
+    assert metrics["eps"] == pytest.approx(2.75)
+    assert metrics["ebitda"] == pytest.approx(123000000.0)
+    assert metrics["dividend_yield"] == pytest.approx(0.012)
+    assert metrics["revenue_ttm"] == pytest.approx(450000000.0)
+    assert metrics["profit_margin"] == pytest.approx(0.18)
+    assert metrics["operating_margin"] == pytest.approx(0.22)
+    assert metrics["return_on_equity"] == pytest.approx(0.16)
+    assert metrics["debt_to_equity"] == pytest.approx(0.55)
+    assert "earnings_surprise_avg" in metrics
+    assert "earnings_positive_ratio" in metrics
+    assert "earnings_signal_score" in metrics
 
 
 def test_alpha_vantage_client_retries(monkeypatch):
@@ -157,3 +198,36 @@ def test_compute_earnings_signal_from_metrics():
     assert signal.multiplier() > 0.5
     metadata = signal.to_metadata()
     assert metadata["confidence_multiplier"] == signal.multiplier()
+
+
+def test_build_fundamentals_payload_formats_metrics():
+    service = SignalService.__new__(SignalService)
+    fundamentals_payload = {
+        "_fetched_at": "2024-05-01T13:45:00",
+        "market_cap": 150_000_000,
+        "pe_ratio": 18.0,
+        "peg_ratio": 1.6,
+        "eps": 2.5,
+        "ebitda": 50_000_000,
+        "dividend_yield": 0.018,
+        "profit_margin": 0.12,
+        "operating_margin": 0.15,
+        "return_on_equity": 0.14,
+        "debt_to_equity": 0.75,
+        "earnings_growth": 0.22,
+        "revenue_ttm": 320_000_000,
+    }
+
+    snapshot = service._build_fundamentals_payload(fundamentals_payload, latest_price=24.15)
+
+    assert snapshot is not None
+    assert snapshot["score"] > 0
+    assert snapshot["updated_at"].isoformat().startswith("2024-05-01T13:45:00")
+    assert snapshot["notes"]
+
+    metrics = {metric["key"]: metric for metric in snapshot["metrics"]}
+    assert metrics["price"]["display"] == "$24.15"
+    assert metrics["pe_ratio"]["display"] == "18.0"
+    assert metrics["dividend_yield"]["display"] == "1.8%"
+    assert metrics["market_cap"]["display"] == "$150.00M"
+    assert "interpretation" in metrics["profit_margin"]

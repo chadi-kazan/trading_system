@@ -7,7 +7,7 @@ import { formatDisplayDate } from "../utils/date";
 
 interface WatchlistPageProps {
   items: SavedSignal[];
-  remove: (id: string) => Promise<void>;
+  remove: (symbol: string) => Promise<void>;
 }
 
 const STATUS_COLORS: Record<WatchlistStatus, string> = {
@@ -29,7 +29,8 @@ export function WatchlistPage({ items, remove }: WatchlistPageProps) {
   }, [items, query]);
 
   const handleOpen = (symbol: string) => {
-    navigate("/", { state: { symbol, fromWatchlist: true } });
+    const record = items.find((entry) => entry.symbol.toUpperCase() === symbol.toUpperCase());
+    navigate(`/symbols/${symbol}`, { state: { status: record?.status ?? WATCHLIST_STATUSES[0] } });
   };
 
   return (
@@ -60,7 +61,7 @@ export function WatchlistPage({ items, remove }: WatchlistPageProps) {
 
       {filtered.length === 0 ? (
         <div className="rounded-2xl border border-dashed border-slate-200 bg-white px-6 py-12 text-center text-sm text-slate-500 shadow-sm shadow-slate-200/60">
-          Nothing saved yet. Head to the dashboard, load a symbol, and use the “Save to watchlist” controls.
+          Nothing saved yet. Head to the dashboard, load a symbol, and use the "Save to watchlist" controls.
         </div>
       ) : (
         <div className="grid gap-6 lg:grid-cols-2">
@@ -90,7 +91,7 @@ export function WatchlistPage({ items, remove }: WatchlistPageProps) {
                 </button>
                 <button
                   className="inline-flex items-center rounded-full border border-slate-200 px-4 py-2 text-sm font-semibold text-slate-500 transition hover:border-rose-300 hover:text-rose-500"
-                  onClick={() => remove(item.id)}
+                  onClick={() => remove(item.symbol)}
                 >
                   Remove
                 </button>

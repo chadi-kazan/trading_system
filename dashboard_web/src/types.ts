@@ -74,6 +74,22 @@ export type EarningsQuality = {
   eps_trend?: number | null;
 };
 
+export type FundamentalMetric = {
+  key: string;
+  label: string;
+  value?: number | null;
+  display?: string | null;
+  ideal?: string | null;
+  interpretation?: string | null;
+};
+
+export type FundamentalSnapshot = {
+  score?: number | null;
+  updated_at?: string | null;
+  notes?: string | null;
+  metrics: FundamentalMetric[];
+};
+
 export type SymbolAnalysis = {
   symbol: string;
   start: string;
@@ -84,6 +100,7 @@ export type SymbolAnalysis = {
   aggregated_signals: AggregatedSignal[];
   macro_overlay?: MacroOverlay | null;
   earnings_quality?: EarningsQuality | null;
+  fundamentals?: FundamentalSnapshot | null;
 };
 
 export type SymbolSearchResult = {
