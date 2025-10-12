@@ -7,7 +7,7 @@ import logging
 import time
 from datetime import datetime
 from pathlib import Path
-from typing import Any, Dict, Iterable, Optional
+from typing import Any, Dict, Iterable, Optional, Sequence
 
 import pandas as pd
 
@@ -101,6 +101,56 @@ def _map_alpha_overview(payload: Dict[str, Any]) -> Dict[str, float]:
     return metrics
 
 
+def _map_earnings_metrics(payload: Dict[str, Any]) -> Dict[str, float]:
+    quarterly = payload.get("quarterlyEarnings") or []
+    if not isinstance(quarterly, Sequence):
+        return {}
+
+    surprises: list[float] = []
+    beats = 0
+    eps_values: list[float] = []
+
+    for row in quarterly[:6]:
+        if not isinstance(row, dict):
+            continue
+        reported = _to_float(row.get("reportedEPS"))
+        estimated = _to_float(row.get("estimatedEPS"))
+        if reported is None:
+            continue
+        eps_values.append(reported)
+        if estimated is None or estimated == 0:
+            continue
+        surprise = (reported - estimated) / abs(estimated)
+        surprises.append(surprise)
+        if reported > estimated:
+            beats += 1
+
+    metrics: Dict[str, float] = {}
+    if surprises:
+        avg_surprise = sum(surprises) / len(surprises)
+        metrics["earnings_surprise_avg"] = avg_surprise
+        metrics["earnings_positive_ratio"] = beats / len(surprises)
+
+    if len(eps_values) >= 2:
+        latest = eps_values[0]
+        prior = eps_values[1]
+        if prior != 0:
+            metrics["earnings_eps_trend"] = (latest - prior) / abs(prior)
+
+    if metrics:
+        components = []
+        if "earnings_positive_ratio" in metrics:
+            components.append(metrics["earnings_positive_ratio"])
+        if "earnings_surprise_avg" in metrics:
+            components.append(max(0.0, min(1.0, 0.5 + metrics["earnings_surprise_avg"] / 0.25)))
+        if "earnings_eps_trend" in metrics:
+            components.append(max(0.0, min(1.0, 0.5 + metrics["earnings_eps_trend"] / 0.25)))
+        if components:
+            metrics["earnings_signal_score"] = sum(components) / len(components)
+
+    return metrics
+
+
 def load_fundamental_metrics(
     symbol: str,
     base_dir: Path,
@@ -188,6 +238,16 @@ def refresh_fundamentals_cache(
             continue
 
         mapped = _map_alpha_overview(overview)
+        try:
+            earnings_payload = av_client.fetch_earnings(symbol)
+        except (AlphaVantageError, Exception) as exc:  # pragma: no cover - network faults
+            LOGGER.debug("Earnings fetch failed for %s: %s", symbol, exc)
+            earnings_metrics = {}
+        else:
+            earnings_metrics = _map_earnings_metrics(earnings_payload)
+
+        if earnings_metrics:
+            mapped.update(earnings_metrics)
         if not mapped:
             LOGGER.info("Alpha Vantage returned no usable metrics for %s", symbol)
             continue

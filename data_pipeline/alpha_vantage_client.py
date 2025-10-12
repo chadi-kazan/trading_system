@@ -101,6 +101,68 @@ class AlphaVantageClient:
         raise AlphaVantageError(f"Failed to fetch overview for {symbol}")
 
     # ------------------------------------------------------------------
+    def fetch_earnings(self, symbol: str) -> Dict[str, Any]:
+        params = {
+            "function": "EARNINGS",
+            "symbol": symbol.upper(),
+            "apikey": self.api_key,
+        }
+
+        last_exc: Exception | None = None
+        for attempt in range(1, self.max_retries + 1):
+            try:
+                response = self.session.get(self.base_url, params=params, timeout=15)
+                response.raise_for_status()
+                payload = response.json()
+            except requests.HTTPError as exc:  # pragma: no cover - network/HTTP errors
+                resp = exc.response
+                if resp is not None and resp.status_code == 429:
+                    wait_seconds = self._retry_after_seconds(resp.headers)
+                    self._handle_rate_limit(symbol, attempt, wait_seconds, detail="HTTP 429 response")
+                    last_exc = exc
+                    continue
+                last_exc = exc
+                LOGGER.warning(
+                    "Alpha Vantage HTTP error for earnings %s (attempt %s/%s): %s",
+                    symbol,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+            except Exception as exc:  # pragma: no cover - network/JSON errors
+                last_exc = exc
+                LOGGER.warning(
+                    "Alpha Vantage earnings request failed for %s (attempt %s/%s): %s",
+                    symbol,
+                    attempt,
+                    self.max_retries,
+                    exc,
+                )
+            else:
+                if not isinstance(payload, dict):
+                    raise AlphaVantageError("Unexpected earnings payload format")
+
+                note = payload.get("Note")
+                if note:
+                    self._handle_rate_limit(symbol, attempt, None, detail=note)
+                    last_exc = AlphaVantageError(note)
+                    continue
+
+                if payload.get("Information"):
+                    raise AlphaVantageError(payload["Information"])  # pragma: no cover
+                if payload.get("Error Message"):
+                    raise AlphaVantageError(payload["Error Message"])  # pragma: no cover
+
+                return payload
+
+            if attempt < self.max_retries and self.backoff_seconds:
+                self._sleep(self.backoff_seconds)
+
+        if last_exc:
+            raise AlphaVantageError(f"Failed to fetch earnings for {symbol}") from last_exc
+        raise AlphaVantageError(f"Failed to fetch earnings for {symbol}")
+
+    # ------------------------------------------------------------------
     def search_symbols(
         self,
         keywords: str,

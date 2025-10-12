@@ -111,6 +111,10 @@ python main.py backtest --help
 - Ensure `automation.fundamentals_refresh.include_sp500` is enabled if you want large-cap sector data preloaded alongside your small-cap research universe.
 
 
+### Macro Regime & Earnings Overlays
+- The API now applies a market-regime multiplier (built from ^VIX, HYG/LQD, and SPY trend) to every aggregated signal. The current regime, score, and contributing factors are returned under macro_overlay for dashboard rendering.
+- Earnings quality metrics (beat ratio, average surprise, EPS trend) are rolled into the fundamentals cache and surfaced as earnings_quality, feeding both scoring multipliers and UI context for each symbol.
+
 ---
 
 ## Investor Workflows & Methodologies
@@ -395,3 +399,4 @@ The system is intentionally modular - adjust a single component (e.g., filters, 
 \n## Cloud Deployment\n- [Cloud deployment plan](docs/cloud_deployment_plan.md): containerisation, hosting, and configuration guidance.\n
 
 
+

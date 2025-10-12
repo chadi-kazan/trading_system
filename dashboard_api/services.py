@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import copy
 import logging
 import time
 from datetime import date, datetime, timedelta
@@ -10,6 +11,12 @@ from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional,
 
 import pandas as pd
 
+from analytics import (
+    MarketRegimeAnalyzer,
+    MarketRegimeSnapshot,
+    EarningsSignal,
+    compute_earnings_signal,
+)
 from data_pipeline import enrich_price_frame, load_fundamental_metrics
 from data_pipeline.alpha_vantage_client import AlphaVantageClient, AlphaVantageError
 from data_providers.base import PriceRequest
@@ -69,6 +76,9 @@ class SignalService:
                 weighting=weights,
             )
         )
+        self._regime_analyzer = MarketRegimeAnalyzer(self.price_provider)
+        self._latest_fundamentals: Dict[str, Dict[str, Any]] = {}
+        self._regime_analyzer = MarketRegimeAnalyzer(self.price_provider)
 
         api_key = self.config.data_sources.alpha_vantage_key
         self.alpha_client: Optional[AlphaVantageClient]
@@ -211,9 +221,18 @@ class SignalService:
             payload = self._build_strategy_analysis(strategy, signals)
             strategy_payloads.append(payload)
 
+        macro_snapshot = self._regime_analyzer.current()
+        earnings_signal = compute_earnings_signal(fundamentals)
+
+        aggregated_raw = list(self.aggregator.aggregate(collected_signals))
+        adjusted_signals = [
+            self._apply_overlays(signal, macro_snapshot, earnings_signal)
+            for signal in aggregated_raw
+        ]
+
         aggregated_signals = [
             self._to_aggregated_payload(signal)
-            for signal in self.aggregator.aggregate(collected_signals)
+            for signal in adjusted_signals
         ]
 
         prices = [self._to_price_bar(idx, row) for idx, row in enriched.iterrows()]
@@ -226,6 +245,8 @@ class SignalService:
             price_bars=prices,
             strategies=strategy_payloads,
             aggregated_signals=aggregated_signals,
+            macro_overlay=self._build_macro_payload(macro_snapshot),
+            earnings_quality=self._build_earnings_payload(earnings_signal),
         )
         self._store_analysis(cache_key, analysis)
         return analysis
@@ -277,6 +298,64 @@ class SignalService:
             confidence=float(signal.confidence),
             metadata=_normalise_metadata(signal.metadata),
         )
+
+    def _apply_overlays(
+        self,
+        signal: StrategySignal,
+        macro: MarketRegimeSnapshot,
+        earnings: EarningsSignal,
+    ) -> StrategySignal:
+        metadata = copy.deepcopy(signal.metadata)
+        macro_metadata = {
+            "regime": macro.name,
+            "score": macro.score,
+            "multiplier": macro.multiplier,
+            "factors": macro.factors,
+            "notes": macro.notes,
+            "updated_at": macro.updated_at.isoformat(),
+        }
+        earnings_metadata = earnings.to_metadata()
+
+        macro_multiplier = macro.multiplier
+        earnings_multiplier = earnings.multiplier()
+        final_confidence = signal.confidence * macro_multiplier * earnings_multiplier
+
+        metadata["macro_overlay"] = macro_metadata
+        metadata["earnings_quality"] = earnings_metadata
+        metadata["confidence_components"] = {
+            "base_confidence": signal.confidence,
+            "macro_multiplier": macro_multiplier,
+            "earnings_multiplier": earnings_multiplier,
+            "final_confidence": final_confidence,
+        }
+
+        return StrategySignal(
+            symbol=signal.symbol,
+            date=signal.date,
+            strategy=signal.strategy,
+            signal_type=signal.signal_type,
+            confidence=float(final_confidence),
+            metadata=metadata,
+        )
+
+    @staticmethod
+    def _build_macro_payload(snapshot: MarketRegimeSnapshot) -> Dict[str, Any]:
+        return {
+            "regime": snapshot.name,
+            "score": snapshot.score,
+            "multiplier": snapshot.multiplier,
+            "factors": snapshot.factors,
+            "notes": snapshot.notes,
+            "updated_at": snapshot.updated_at.isoformat(),
+        }
+
+    @staticmethod
+    def _build_earnings_payload(signal: EarningsSignal) -> Dict[str, Any] | None:
+        payload = signal.to_metadata()
+        if all(value is None for key, value in payload.items() if key != "confidence_multiplier"):
+            return None
+        payload["multiplier"] = payload.pop("confidence_multiplier")
+        return payload
 
     def _analysis_cache_key(
         self,
@@ -519,7 +598,7 @@ class BaseMomentumService:
             return None
 
         enriched = self._prepare_enriched_frame(symbol, frame)
-        strategy_scores, final_score = self._score_symbol(symbol, enriched)
+        strategy_scores, final_score, overlays = self._score_symbol(symbol, enriched)
 
         latest_row = frame.iloc[-1]
         last_close = _safe_float(latest_row.get("close"))
@@ -552,6 +631,7 @@ class BaseMomentumService:
             data_points=len(frame.index),
             strategy_scores=strategy_scores,
             final_score=final_score,
+            overlays=overlays,
         )
 
     def _prepare_enriched_frame(self, symbol: str, frame: pd.DataFrame) -> pd.DataFrame:
@@ -565,10 +645,19 @@ class BaseMomentumService:
         except Exception as exc:  # pragma: no cover - defensive logging
             LOGGER.debug("Fundamentals lookup failed for %s: %s", symbol, exc)
 
+        if fundamentals:
+            self._latest_fundamentals[symbol.upper()] = fundamentals
+        else:
+            self._latest_fundamentals.pop(symbol.upper(), None)
+
         enriched = enrich_price_frame(symbol, frame, fundamentals=fundamentals)
         return _ensure_additional_indicators(self._strategy_map, enriched)
 
-    def _score_symbol(self, symbol: str, enriched: pd.DataFrame) -> Tuple[Dict[str, float], Optional[float]]:
+    def _score_symbol(
+        self,
+        symbol: str,
+        enriched: pd.DataFrame,
+    ) -> Tuple[Dict[str, float], Optional[float], Dict[str, Optional[float]]]:
         scores: Dict[str, float] = {}
         collected: List[StrategySignal] = []
 
@@ -589,8 +678,22 @@ class BaseMomentumService:
                 scores[name] = 0.0
 
         aggregated = list(self.aggregator.aggregate(collected))
-        final_score = float(aggregated[-1].confidence) if aggregated else None
-        return scores, final_score
+        macro_snapshot = self._regime_analyzer.current()
+        fundamentals = self._latest_fundamentals.get(symbol.upper(), {})
+        earnings_signal = compute_earnings_signal(fundamentals)
+        overlays = {
+            "macro_multiplier": macro_snapshot.multiplier,
+            "earnings_multiplier": earnings_signal.multiplier(),
+            "macro_score": macro_snapshot.score,
+            "earnings_score": earnings_signal.score if earnings_signal.score is not None else None,
+        }
+
+        if not aggregated:
+            return scores, None, overlays
+
+        base_confidence = float(aggregated[-1].confidence)
+        final_score = base_confidence * overlays["macro_multiplier"] * overlays["earnings_multiplier"]
+        return scores, final_score, overlays
 
     def _select_reference_price(self, frame: pd.DataFrame, timeframe: str) -> Optional[float]:
         if frame.empty:
@@ -837,5 +940,4 @@ class MomentumAnalyticsService:
 
 
 __all__ = ["SignalService", "RussellMomentumService", "SPMomentumService", "MomentumAnalyticsService", "RateLimitError"]
-
 

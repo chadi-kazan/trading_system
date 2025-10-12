@@ -142,3 +142,10 @@ Deliver a weekly-use research assistant for novice-to-intermediate small-cap inv
 - [x] ~~Add S&P 500 momentum service and dashboard parity with Russell flows. (Completed: 2025-10-07)~~
 - [x] ~~Expose sortable strategy/final scores on momentum tables. (Completed: 2025-10-07)~~
 - [x] ~~Surface strategy tooltips with investment bounds on analysis cards. (Completed: 2025-10-07)~~
+
+## Future Analytics Backlog
+- Volatility-adjusted sizing and position throttling to complement trend overlays.
+- Cross-sector/style relative-strength rotation layer to prioritise opportunity sets.
+- Insider and institutional flow indicators to filter out weak conviction setups.
+- Alternative data hooks (traffic, downloads, thematic signals) for highest-conviction names.
+- Risk-parity style watchlist guardrail to balance factor exposures.

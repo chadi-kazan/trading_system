@@ -48,6 +48,23 @@ class AggregatedSignalPayload(BaseModel):
     metadata: Dict[str, Any] = Field(default_factory=dict)
 
 
+class MacroOverlayPayload(BaseModel):
+    regime: str
+    score: float
+    multiplier: float
+    factors: Dict[str, float] = Field(default_factory=dict)
+    notes: Optional[str] = None
+    updated_at: datetime
+
+
+class EarningsQualityPayload(BaseModel):
+    score: Optional[float] = None
+    multiplier: Optional[float] = None
+    surprise_average: Optional[float] = None
+    positive_ratio: Optional[float] = None
+    eps_trend: Optional[float] = None
+
+
 class PriceBar(BaseModel):
     date: datetime
     open: float
@@ -74,6 +91,8 @@ class SymbolAnalysisResponse(BaseModel):
     price_bars: List[PriceBar]
     strategies: List[StrategyAnalysis]
     aggregated_signals: List[AggregatedSignalPayload] = Field(default_factory=list)
+    macro_overlay: Optional[MacroOverlayPayload] = None
+    earnings_quality: Optional[EarningsQualityPayload] = None
 
 
 class SymbolSearchResult(BaseModel):
@@ -108,6 +127,7 @@ class MomentumEntry(BaseModel):
     data_points: int
     strategy_scores: Dict[str, float] = Field(default_factory=dict)
     final_score: Optional[float] = None
+    overlays: Dict[str, Optional[float]] = Field(default_factory=dict)
 
 
 class MomentumResponse(BaseModel):
@@ -140,6 +160,8 @@ class SectorScoreResponse(BaseModel):
 
 __all__ = [
     "AggregatedSignalPayload",
+    "MacroOverlayPayload",
+    "EarningsQualityPayload",
     "HealthResponse",
     "PriceBar",
     "SearchResponse",
@@ -153,4 +175,3 @@ __all__ = [
     "SymbolAnalysisResponse",
     "SymbolSearchResult",
 ]
-

@@ -7,6 +7,7 @@ import pytest
 
 from data_pipeline import fundamentals
 from data_pipeline.fundamentals import load_fundamental_metrics
+from analytics import compute_earnings_signal
 
 
 def test_load_fundamental_metrics_from_json(tmp_path: Path):
@@ -126,3 +127,33 @@ def test_alpha_vantage_client_handles_http_rate_limit(monkeypatch):
 
     assert data['QuarterlyEarningsGrowthYOY'] == '0.3'
     assert sleeps and pytest.approx(sleeps[0], rel=1e-6) == 2.0
+
+
+def test_map_earnings_metrics_builds_scores():
+    payload = {
+        "quarterlyEarnings": [
+            {"reportedEPS": "1.20", "estimatedEPS": "1.00"},
+            {"reportedEPS": "1.05", "estimatedEPS": "0.98"},
+            {"reportedEPS": "0.90", "estimatedEPS": "1.02"},
+            {"reportedEPS": "0.85", "estimatedEPS": "0.80"},
+        ]
+    }
+    metrics = fundamentals._map_earnings_metrics(payload)
+    assert "earnings_surprise_avg" in metrics
+    assert "earnings_positive_ratio" in metrics
+    assert "earnings_signal_score" in metrics
+    assert metrics["earnings_positive_ratio"] == pytest.approx(0.75)
+    assert 0 <= metrics["earnings_signal_score"] <= 1
+
+
+def test_compute_earnings_signal_from_metrics():
+    fundamentals_payload = {
+        "earnings_surprise_avg": 0.08,
+        "earnings_positive_ratio": 0.75,
+        "earnings_eps_trend": 0.12,
+    }
+    signal = compute_earnings_signal(fundamentals_payload)
+    assert signal.score is not None
+    assert signal.multiplier() > 0.5
+    metadata = signal.to_metadata()
+    assert metadata["confidence_multiplier"] == signal.multiplier()

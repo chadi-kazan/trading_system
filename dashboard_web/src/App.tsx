@@ -26,6 +26,27 @@ function formatDate(date: Date): string {
   return date.toISOString().split("T")[0];
 }
 
+function formatPercentValue(value: number | null | undefined, digits = 0): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+  return `${(value * 100).toFixed(digits)}%`;
+}
+
+function formatRawPercent(value: number | null | undefined, digits = 1): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "—";
+  }
+  return `${value.toFixed(digits)}%`;
+}
+
+function formatMultiplierValue(value: number | null | undefined): string {
+  if (value === null || value === undefined || Number.isNaN(value)) {
+    return "×1.00";
+  }
+  return `×${value.toFixed(2)}`;
+}
+
 function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined) {
   const annotations: {
     breakout?: number | null;
@@ -92,6 +113,9 @@ function DashboardPage({
   const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
   const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
+  const macroOverlay = analysis?.macro_overlay ?? null;
+  const macroFactorEntries = macroOverlay ? Object.entries(macroOverlay.factors ?? {}) : [];
+  const earningsQuality = analysis?.earnings_quality ?? null;
   const finalScores: StrategyScore[] = useMemo(() => {
     if (!strategyCards.length) return [];
     return strategyCards.map((strategy) => {
@@ -430,6 +454,33 @@ function DashboardPage({
                   </p>
                 )
               ) : null}
+              {(macroOverlay || earningsQuality) ? (
+                <div className="mt-3 flex flex-wrap gap-2">
+                  {macroOverlay ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-slate-100 px-3 py-1 text-xs font-semibold text-slate-600">
+                      <span className="text-slate-500">Macro:</span>
+                      <span className="uppercase tracking-wide text-slate-700">{macroOverlay.regime.replace(/_/g, " ")}</span>
+                      <span className="text-slate-500">score {formatPercentValue(macroOverlay.score, 0)}</span>
+                      <span className="text-slate-500">{formatMultiplierValue(macroOverlay.multiplier)}</span>
+                    </span>
+                  ) : null}
+                  {earningsQuality ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-700">
+                      <span>Earnings:</span>
+                      <span className="text-emerald-600">
+                        {earningsQuality.score != null ? formatPercentValue(earningsQuality.score, 0) : "—"}
+                      </span>
+                      {earningsQuality.positive_ratio != null ? (
+                        <span className="text-emerald-500">beats {formatPercentValue(earningsQuality.positive_ratio, 0)}</span>
+                      ) : null}
+                      {earningsQuality.surprise_average != null ? (
+                        <span className="text-emerald-500">surprise {formatPercentValue(earningsQuality.surprise_average, 1)}</span>
+                      ) : null}
+                      <span className="text-emerald-500">{formatMultiplierValue(earningsQuality.multiplier ?? null)}</span>
+                    </span>
+                  ) : null}
+                </div>
+              ) : null}
             </div>
             {selectedSymbol && (
               <div className="flex flex-wrap items-center gap-3">
@@ -456,6 +507,59 @@ function DashboardPage({
             <AggregatedSignals signals={aggregatedSignals} />
             <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
             <FinalScoreChart scores={finalScores} average={averageScore} />
+            {macroOverlay || earningsQuality ? (
+              <div className="rounded-2xl border border-slate-200 bg-white px-5 py-4 shadow-sm shadow-slate-200/60">
+                <h3 className="text-sm font-semibold text-slate-900">Macro &amp; Earnings Overlay</h3>
+                {macroOverlay ? (
+                  <div className="mt-3 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-700">Macro regime</p>
+                    <p className="mt-1">
+                      <span className="uppercase tracking-wide text-slate-500">{macroOverlay.regime.replace(/_/g, " ")}</span>
+                      <span className="ml-2 text-slate-500">Score {formatPercentValue(macroOverlay.score, 0)}</span>
+                      <span className="ml-2 text-slate-500">{formatMultiplierValue(macroOverlay.multiplier)}</span>
+                    </p>
+                    {macroFactorEntries.length ? (
+                      <ul className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
+                        {macroFactorEntries.map(([name, value]) => (
+                          <li key={name} className="flex justify-between gap-2">
+                            <span className="uppercase tracking-wide text-slate-400">{name.replace(/_/g, " ")}</span>
+                            <span>{Number.isFinite(value) ? Number(value).toFixed(3) : "—"}</span>
+                          </li>
+                        ))}
+                      </ul>
+                    ) : null}
+                  </div>
+                ) : null}
+                {earningsQuality ? (
+                  <div className="mt-3 text-xs text-slate-600">
+                    <p className="font-semibold text-slate-700">Earnings quality</p>
+                    <div className="mt-1 flex flex-wrap gap-2">
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        Score {earningsQuality.score != null ? formatPercentValue(earningsQuality.score, 0) : "—"}
+                      </span>
+                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
+                        {formatMultiplierValue(earningsQuality.multiplier ?? null)}
+                      </span>
+                      {earningsQuality.positive_ratio != null ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          Beats {formatPercentValue(earningsQuality.positive_ratio, 0)}
+                        </span>
+                      ) : null}
+                      {earningsQuality.surprise_average != null ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          Avg surprise {formatPercentValue(earningsQuality.surprise_average, 1)}
+                        </span>
+                      ) : null}
+                      {earningsQuality.eps_trend != null ? (
+                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
+                          EPS trend {formatPercentValue(earningsQuality.eps_trend, 1)}
+                        </span>
+                      ) : null}
+                    </div>
+                  </div>
+                ) : null}
+              </div>
+            ) : null}
           </div>
           <div className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60">
             <h3 className="text-sm font-semibold text-slate-900">Save to watchlist</h3>
@@ -712,7 +816,6 @@ export default function App() {
     </BrowserRouter>
   );
 }
-
 
 
 

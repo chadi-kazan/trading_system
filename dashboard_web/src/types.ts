@@ -57,6 +57,23 @@ export type PriceBar = {
   atr?: number | null;
 };
 
+export type MacroOverlay = {
+  regime: string;
+  score: number;
+  multiplier: number;
+  factors: Record<string, number>;
+  notes?: string | null;
+  updated_at: string;
+};
+
+export type EarningsQuality = {
+  score?: number | null;
+  multiplier?: number | null;
+  surprise_average?: number | null;
+  positive_ratio?: number | null;
+  eps_trend?: number | null;
+};
+
 export type SymbolAnalysis = {
   symbol: string;
   start: string;
@@ -65,6 +82,8 @@ export type SymbolAnalysis = {
   price_bars: PriceBar[];
   strategies: StrategyAnalysis[];
   aggregated_signals: AggregatedSignal[];
+  macro_overlay?: MacroOverlay | null;
+  earnings_quality?: EarningsQuality | null;
 };
 
 export type SymbolSearchResult = {
@@ -167,6 +186,7 @@ export type MomentumEntry = {
   data_points: number;
   strategy_scores: Record<string, number>;
   final_score?: number | null;
+  overlays?: Record<string, number | null>;
 };
 
 export type MomentumResponse = {

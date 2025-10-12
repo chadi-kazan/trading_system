@@ -228,9 +228,12 @@ def test_schedule_fundamentals_cli(monkeypatch, tmp_path):
 
     assert result == 0
     assert captured["config"] is config
+    schedule_cfg = ctx.config.automation.fundamentals_refresh
     assert captured["kwargs"]["run_once"] is True
     assert captured["kwargs"]["limit"] == 10
     assert captured["kwargs"]["max_iterations"] is None
+    assert captured["kwargs"]["include_sp500"] == schedule_cfg.include_sp500
+    assert captured["kwargs"]["include_russell"] == schedule_cfg.include_russell
 
 
 def test_schedule_fundamentals_cli_requires_force(monkeypatch, tmp_path):
@@ -257,6 +260,19 @@ def test_schedule_fundamentals_cli_requires_force(monkeypatch, tmp_path):
 def test_schedule_fundamentals_cli_conflicting_flags(monkeypatch, tmp_path):
     parser = build_parser()
     args = parser.parse_args(["schedule-fundamentals", "--include-russell", "--skip-russell", "--force"])
+
+    ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
+
+    monkeypatch.setattr('main.run_scheduled_refresh', lambda *_, **__: (_ for _ in ()).throw(AssertionError("should not run")))
+
+    result = args.handler(args, ctx)
+
+    assert result == 1
+
+
+def test_schedule_fundamentals_cli_conflicting_sp500_flags(monkeypatch, tmp_path):
+    parser = build_parser()
+    args = parser.parse_args(["schedule-fundamentals", "--include-sp500", "--skip-sp500", "--force"])
 
     ctx = AppContext(manager=None, config=_prepare_schedule_config(tmp_path))
 
