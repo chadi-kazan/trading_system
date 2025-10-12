@@ -456,12 +456,12 @@ function SymbolDashboardPage({
     const primary =
       take(
         comparisonAnalyses[activeComparison.primary.toUpperCase()] ??
-          (symbol === activeComparison.primary.toUpperCase() ? analysis ?? undefined : undefined),
+        (symbol === activeComparison.primary.toUpperCase() ? analysis ?? undefined : undefined),
       );
     const secondary =
       take(
         comparisonAnalyses[activeComparison.secondary.toUpperCase()] ??
-          (symbol === activeComparison.secondary.toUpperCase() ? analysis ?? undefined : undefined),
+        (symbol === activeComparison.secondary.toUpperCase() ? analysis ?? undefined : undefined),
       );
     return { primaryScore: primary, secondaryScore: secondary };
   }, [activeComparison, analysis, comparisonAnalyses, symbol]);
@@ -525,8 +525,8 @@ function SymbolDashboardPage({
               {sectorContext.universe === "russell"
                 ? "Small-cap (Russell 2000)"
                 : sectorContext.universe === "sp500"
-                ? "Large-cap (S&P 500)"
-                : "Tracked universe"}{" "}
+                  ? "Large-cap (S&P 500)"
+                  : "Tracked universe"}{" "}
               ({sectorContext.sampleSize} symbols)
             </p>
           ) : (
@@ -657,12 +657,12 @@ function MacroEarningsCard({
     () =>
       earningsQuality
         ? [
-            { key: "score", value: earningsQuality.score ?? null },
-            { key: "multiplier", value: earningsQuality.multiplier ?? null },
-            { key: "positive_ratio", value: earningsQuality.positive_ratio ?? null },
-            { key: "surprise_average", value: earningsQuality.surprise_average ?? null },
-            { key: "eps_trend", value: earningsQuality.eps_trend ?? null },
-          ]
+          { key: "score", value: earningsQuality.score ?? null },
+          { key: "multiplier", value: earningsQuality.multiplier ?? null },
+          { key: "positive_ratio", value: earningsQuality.positive_ratio ?? null },
+          { key: "surprise_average", value: earningsQuality.surprise_average ?? null },
+          { key: "eps_trend", value: earningsQuality.eps_trend ?? null },
+        ]
         : [],
     [earningsQuality],
   );
@@ -792,7 +792,7 @@ function SignalCarousel({
       key: "overview",
       title: "Signal overview",
       description:
-        "Composite confidence plus aggregated signals across CAN SLIM, Zanger, trend-following, and Livermore strategies.",
+        "Composite confidence + aggregated signals across strategies.",
       meta: (
         <div className="text-right">
           <span className="text-xs uppercase tracking-wide text-slate-400">Latest aggregated</span>
@@ -859,7 +859,47 @@ function SignalCarousel({
           <h2 className="text-lg font-semibold text-slate-900">{activeSlide.title}</h2>
           <p className="text-xs text-slate-500">{activeSlide.description}</p>
         </div>
-        {activeSlide.meta}
+        <div className="flex items-start gap-3">
+          {activeSlide.meta}
+          {slides.length > 1 ? (
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrevious}
+                aria-label="Previous slide"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40"
+                disabled={slides.length <= 1}
+              >
+                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
+                  <path
+                    d="M9.5 4.5 6 8l3.5 3.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+              <button
+                type="button"
+                onClick={handleNext}
+                aria-label="Next slide"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-600 transition hover:border-blue-300 hover:text-blue-600 disabled:opacity-40"
+                disabled={slides.length <= 1}
+              >
+                <svg viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-4 w-4">
+                  <path
+                    d="M6.5 4.5 10 8l-3.5 3.5"
+                    stroke="currentColor"
+                    strokeWidth="1.6"
+                    strokeLinecap="round"
+                    strokeLinejoin="round"
+                  />
+                </svg>
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
 
       <div className="mt-4 flex-1">{activeSlide.content}</div>
@@ -870,33 +910,14 @@ function SignalCarousel({
             {slides.map((slide, slideIndex) => (
               <span
                 key={slide.key}
-                className={`h-2 w-2 rounded-full transition ${
-                  slideIndex === index ? "bg-blue-500" : "bg-slate-300"
-                }`}
+                className={`h-2 w-2 rounded-full transition ${slideIndex === index ? "bg-blue-500" : "bg-slate-300"
+                  }`}
               />
             ))}
           </div>
-          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
-            <button
-              type="button"
-              onClick={handlePrevious}
-              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
-              aria-label="Previous slide"
-            >
-              Previous
-            </button>
-            <span>
-              {index + 1} / {slides.length}
-            </span>
-            <button
-              type="button"
-              onClick={handleNext}
-              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
-              aria-label="Next slide"
-            >
-              Next
-            </button>
-          </div>
+          <span className="text-xs font-semibold text-slate-500">
+            {index + 1} / {slides.length}
+          </span>
         </div>
       ) : null}
     </section>
@@ -947,8 +968,7 @@ function AppLayout({
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
-                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                    isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
+                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
                   }`
                 }
               >
