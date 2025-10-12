@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
   Area,
   AreaChart,
@@ -49,9 +50,10 @@ function getBadge(strategy: StrategyAnalysis): { tone: "positive" | "neutral" | 
       return { tone: "warning", text: "Needs stronger fundamentals" };
     }
     case "trend_following": {
-      const spread = typeof meta.fast_ema === "number" && typeof meta.slow_ema === "number"
-        ? meta.fast_ema - meta.slow_ema
-        : undefined;
+      const spread =
+        typeof meta.fast_ema === "number" && typeof meta.slow_ema === "number"
+          ? meta.fast_ema - meta.slow_ema
+          : undefined;
       if (spread && spread > 0) return { tone: "positive", text: "Momentum aligned" };
       if (!spread) return { tone: "neutral", text: "Tracking trend" };
       return { tone: "warning", text: "Momentum fading" };
@@ -140,9 +142,7 @@ function renderMetadata(strategy: StrategyAnalysis) {
         {entries.map(([key, value]) => (
           <li key={key} className="flex items-center justify-between gap-2">
             <span className="text-xs font-medium text-slate-500">{key.replace(/_/g, " ")}</span>
-            <span className="text-sm text-slate-700">
-              {typeof value === "number" ? value.toFixed(3) : String(value)}
-            </span>
+            <span className="text-sm text-slate-700">{typeof value === "number" ? value.toFixed(3) : String(value)}</span>
           </li>
         ))}
       </ul>
@@ -174,8 +174,7 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
     latestConfidencePercent !== null && sectorAveragePercent !== null
       ? Number((latestConfidencePercent - sectorAveragePercent).toFixed(1))
       : null;
-  const sectorSampleSize =
-    typeof sectorScore?.sampleSize === "number" ? sectorScore.sampleSize : null;
+  const sectorSampleSize = typeof sectorScore?.sampleSize === "number" ? sectorScore.sampleSize : null;
   const hasSectorSample = sectorSampleSize !== null;
   const sectorSampleLabel = hasSectorSample ? `n=${sectorSampleSize}` : "n=NA";
 
@@ -211,8 +210,14 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
     </div>
   );
 
+  const [expanded, setExpanded] = useState(false);
+  const toggleExpanded = () => setExpanded((prev) => !prev);
+  const chartNode = expanded ? renderConfidenceChart(strategy) : null;
+  const metadataNode = expanded ? renderMetadata(strategy) : null;
+  const showSectorContext = expanded && (sectorAveragePercent !== null || strategy.score_guidance);
+
   return (
-    <article className="flex flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+    <article className="flex min-h-[240px] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">
@@ -228,42 +233,71 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
             </Tooltip>
           </div>
         </div>
-        <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeStyles[badge.tone]}`}>
+        <span
+          className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-semibold uppercase tracking-wide ${badgeStyles[badge.tone]}`}
+        >
           {badge.text}
         </span>
       </div>
-      <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
-        <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
-          <span>Current Score</span>
-          <span className="text-sm font-semibold text-slate-900">{formatPercent(latestConfidencePercent)}</span>
+
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
+        <div>
+          <span className="text-xs uppercase tracking-wide text-slate-400">Current Score</span>
+          <p className="text-lg font-semibold text-slate-900">{formatPercent(latestConfidencePercent)}</p>
         </div>
-        {sectorAveragePercent !== null ? (
-          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
-            <div>
-              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sector Average</span>
-              <span className="block text-sm font-semibold text-slate-900">{formatPercent(sectorAveragePercent)}</span>
-            </div>
-            <div className="flex flex-col items-end text-xs text-slate-500">
-              <span className="text-[11px] uppercase tracking-wide text-slate-400">Sample</span>
-              <span className="text-sm font-medium text-slate-700">{sectorSampleLabel}</span>
-              {sectorPerformanceDelta !== null ? (
-                <span
-                  className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${sectorPerformanceDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                    }`}
-                >
-                  {sectorPerformanceDelta >= 0 ? "+" : ""}
-                  {sectorPerformanceDelta.toFixed(1)} pts vs sector
-                </span>
+        <button
+          type="button"
+          onClick={toggleExpanded}
+          aria-expanded={expanded}
+          className="inline-flex items-center rounded-full border border-slate-200 bg-white px-3 py-1 text-xs font-semibold text-slate-600 transition hover:border-blue-300 hover:text-blue-600 focus:outline-none focus:ring-2 focus:ring-blue-500/60"
+        >
+          {expanded ? "Hide details" : "Show details"}
+        </button>
+      </div>
+
+      {expanded ? (
+        <div className="space-y-4">
+          {showSectorContext ? (
+            <div className="space-y-3 rounded-xl border border-slate-100 bg-white px-4 py-4 text-sm text-slate-600">
+              {sectorAveragePercent !== null ? (
+                <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-slate-50 px-3 py-2">
+                  <div>
+                    <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sector Average</span>
+                    <span className="block text-sm font-semibold text-slate-900">
+                      {formatPercent(sectorAveragePercent)}
+                    </span>
+                  </div>
+                  <div className="flex flex-col items-end text-xs text-slate-500">
+                    <span className="text-[11px] uppercase tracking-wide text-slate-400">Sample</span>
+                    <span className="text-sm font-medium text-slate-700">{sectorSampleLabel}</span>
+                    {sectorPerformanceDelta !== null ? (
+                      <span
+                        className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                          sectorPerformanceDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                        }`}
+                      >
+                        {sectorPerformanceDelta >= 0 ? "+" : ""}
+                        {sectorPerformanceDelta.toFixed(1)} pts vs sector
+                      </span>
+                    ) : null}
+                  </div>
+                </div>
+              ) : null}
+              {strategy.score_guidance ? (
+                <p className="text-xs leading-relaxed text-slate-500">{strategy.score_guidance}</p>
               ) : null}
             </div>
-          </div>
-        ) : null}
-        {strategy.score_guidance ? (
-          <p className="mt-3 text-xs leading-relaxed text-slate-500">{strategy.score_guidance}</p>
-        ) : null}
-      </div>
-      {renderConfidenceChart(strategy)}
-      {renderMetadata(strategy)}
+          ) : null}
+
+          {chartNode ? <div className="rounded-2xl border border-slate-100 bg-white px-3 py-3">{chartNode}</div> : null}
+
+          {metadataNode}
+        </div>
+      ) : (
+        <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50 px-4 py-3 text-xs text-slate-500">
+          Expand to explore sector context, confidence trend, and latest metadata.
+        </div>
+      )}
     </article>
   );
 }

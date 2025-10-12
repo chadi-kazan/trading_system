@@ -564,26 +564,14 @@ function SymbolDashboardPage({
       {analysis ? (
         <div className="grid gap-6 xl:grid-cols-[minmax(0,2fr),minmax(0,1fr)]">
           <div className="space-y-6">
-            <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
-              <div className="flex flex-wrap items-center justify-between gap-4">
-                <div>
-                  <h2 className="text-lg font-semibold text-slate-900">Signal overview</h2>
-                  <p className="text-xs text-slate-500">
-                    Aggregated signal blends CAN SLIM, Dan Zanger, trend-following, and Livermore confidence scores.
-                  </p>
-                </div>
-                <div className="text-right">
-                  <span className="text-xs uppercase tracking-wide text-slate-400">Latest aggregated</span>
-                  <p className="text-xl font-semibold text-slate-900">
-                    {latestAggregated ? formatPercent(Math.max(0, Math.min(latestAggregated.confidence, 1)), 0) : "--"}
-                  </p>
-                </div>
-              </div>
-              <div className="mt-4 grid gap-4 md:grid-cols-[1.4fr,1fr]">
-                <FinalScoreChart scores={finalScores} average={averageScore} />
-                <AggregatedSignals signals={aggregatedSignals} />
-              </div>
-            </div>
+            <SignalCarousel
+              finalScores={finalScores}
+              averageScore={averageScore}
+              aggregatedSignals={aggregatedSignals}
+              latestAggregated={latestAggregated ?? null}
+              strategyCards={strategyCards}
+              sectorScores={sectorScores}
+            />
 
             <div className="grid gap-6 lg:grid-cols-2">
               <FundamentalsCard fundamentals={fundamentalsSnapshot} />
@@ -596,16 +584,6 @@ function SymbolDashboardPage({
 
             <ScenarioCallouts aggregatedSignals={aggregatedSignals} strategies={strategyCards} />
             <PriceChart data={analysis.price_bars} annotations={annotations} latestAggregated={latestAggregated} />
-
-            <div className="grid gap-6 md:grid-cols-2">
-              {strategyCards.map((strategy) => (
-                <StrategyCard
-                  key={strategy.name}
-                  strategy={strategy}
-                  sectorScore={sectorScores?.[strategy.name] ?? null}
-                />
-              ))}
-            </div>
 
             <SignalComparisonPanel
               inputs={comparisonInputs}
@@ -789,6 +767,142 @@ function MacroEarningsCard({
     </article>
   );
 }
+
+type SignalCarouselProps = {
+  finalScores: StrategyScore[];
+  averageScore: number;
+  aggregatedSignals: AggregatedSignal[];
+  latestAggregated: AggregatedSignal | null;
+  strategyCards: StrategyAnalysis[];
+  sectorScores: Record<string, { average: number; sampleSize: number }> | null;
+};
+
+function SignalCarousel({
+  finalScores,
+  averageScore,
+  aggregatedSignals,
+  latestAggregated,
+  strategyCards,
+  sectorScores,
+}: SignalCarouselProps) {
+  const [index, setIndex] = useState(0);
+
+  const slides = useMemo(() => {
+    const overviewSlide = {
+      key: "overview",
+      title: "Signal overview",
+      description:
+        "Composite confidence plus aggregated signals across CAN SLIM, Zanger, trend-following, and Livermore strategies.",
+      meta: (
+        <div className="text-right">
+          <span className="text-xs uppercase tracking-wide text-slate-400">Latest aggregated</span>
+          <p className="text-xl font-semibold text-slate-900">
+            {latestAggregated ? formatPercent(Math.max(0, Math.min(latestAggregated.confidence, 1)), 0) : "--"}
+          </p>
+        </div>
+      ),
+      content: (
+        <div className="grid h-full gap-4 md:grid-cols-[1.4fr,1fr]">
+          <FinalScoreChart scores={finalScores} average={averageScore} />
+          <AggregatedSignals signals={aggregatedSignals} />
+        </div>
+      ),
+    };
+
+    const result = [overviewSlide];
+
+    if (strategyCards.length > 0) {
+      result.push({
+        key: "strategies",
+        title: "Strategy breakdown",
+        description: "Review per-strategy signals in one place to compare confidence, setups, and sector context.",
+        meta: null,
+        content: (
+          <div className="grid h-full gap-4 md:grid-cols-2">
+            {strategyCards.map((strategy) => (
+              <StrategyCard
+                key={strategy.name}
+                strategy={strategy}
+                sectorScore={sectorScores?.[strategy.name] ?? null}
+              />
+            ))}
+          </div>
+        ),
+      });
+    }
+
+    return result;
+  }, [aggregatedSignals, averageScore, finalScores, latestAggregated, sectorScores, strategyCards]);
+
+  useEffect(() => {
+    if (index >= slides.length) {
+      setIndex(Math.max(slides.length - 1, 0));
+    }
+  }, [index, slides.length]);
+
+  const activeSlide = slides[index] ?? slides[0];
+
+  const handlePrevious = () => {
+    if (slides.length <= 1) return;
+    setIndex((prev) => (prev - 1 + slides.length) % slides.length);
+  };
+
+  const handleNext = () => {
+    if (slides.length <= 1) return;
+    setIndex((prev) => (prev + 1) % slides.length);
+  };
+
+  return (
+    <section className="flex min-h-[360px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+      <div className="flex flex-wrap items-start justify-between gap-4">
+        <div>
+          <h2 className="text-lg font-semibold text-slate-900">{activeSlide.title}</h2>
+          <p className="text-xs text-slate-500">{activeSlide.description}</p>
+        </div>
+        {activeSlide.meta}
+      </div>
+
+      <div className="mt-4 flex-1">{activeSlide.content}</div>
+
+      {slides.length > 1 ? (
+        <div className="mt-6 flex flex-wrap items-center justify-between gap-3 border-t border-slate-100 pt-4">
+          <div className="flex items-center gap-1">
+            {slides.map((slide, slideIndex) => (
+              <span
+                key={slide.key}
+                className={`h-2 w-2 rounded-full transition ${
+                  slideIndex === index ? "bg-blue-500" : "bg-slate-300"
+                }`}
+              />
+            ))}
+          </div>
+          <div className="flex items-center gap-2 text-xs font-medium text-slate-500">
+            <button
+              type="button"
+              onClick={handlePrevious}
+              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
+              aria-label="Previous slide"
+            >
+              Previous
+            </button>
+            <span>
+              {index + 1} / {slides.length}
+            </span>
+            <button
+              type="button"
+              onClick={handleNext}
+              className="inline-flex items-center rounded-full border border-slate-200 px-3 py-1 text-slate-600 transition hover:border-blue-300 hover:text-blue-600"
+              aria-label="Next slide"
+            >
+              Next
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
 const navLinks = [
   { label: "Search", to: "/" },
   { label: "Watchlist", to: "/watchlist" },
