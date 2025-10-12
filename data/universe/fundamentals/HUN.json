@@ -1,1 +1,1 @@
-{"source": "alpha_vantage", "fetched_at": "2025-10-12T13:59:41.921298", "data": {"earnings_growth": 0.206, "relative_strength": 0.1342234715390021, "market_cap": 1410867000.0}}
+{"source": "alpha_vantage", "fetched_at": "2025-10-12T15:03:28.819325", "data": {"earnings_growth": 0.206, "relative_strength": 0.1342234715390021, "market_cap": 1410867000.0, "earnings_surprise_avg": -0.9935760389909768, "earnings_positive_ratio": 0.0, "earnings_eps_trend": -0.8181818181818182, "earnings_signal_score": 0.0}}
