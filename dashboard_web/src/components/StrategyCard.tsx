@@ -18,6 +18,7 @@ import { Tooltip, InfoIcon } from "./Tooltip";
 
 interface StrategyCardProps {
   strategy: StrategyAnalysis;
+  sectorScore?: { average: number; sampleSize: number } | null;
 }
 
 const tooltipFormatter = (value: number | string | Array<number | string>) => {
@@ -149,7 +150,17 @@ function renderMetadata(strategy: StrategyAnalysis) {
   );
 }
 
-export function StrategyCard({ strategy }: StrategyCardProps) {
+export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
+  const toPercent = (value: number | null | undefined): number | null => {
+    if (typeof value !== "number" || Number.isNaN(value)) return null;
+    const clamped = Math.max(0, Math.min(value, 1));
+    return clamped * 100;
+  };
+
+  const formatPercent = (value: number | null, digits = 1): string => {
+    if (value === null) return "--";
+    return `${value.toFixed(digits)}%`;
+  };
   const badge = getBadge(strategy);
   const badgeStyles: Record<typeof badge.tone, string> = {
     positive: "bg-emerald-50 text-emerald-700 border border-emerald-200",
@@ -157,8 +168,16 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
     warning: "bg-amber-50 text-amber-700 border border-amber-200",
   };
   const latestSignal = strategy.signals.at(-1);
-  const latestConfidence = typeof latestSignal?.confidence === "number" ? latestSignal.confidence : null;
-  const latestConfidencePercent = latestConfidence !== null ? Math.round(latestConfidence * 100) : null;
+  const latestConfidencePercent = toPercent(latestSignal?.confidence);
+  const sectorAveragePercent = sectorScore ? toPercent(sectorScore.average) : null;
+  const sectorPerformanceDelta =
+    latestConfidencePercent !== null && sectorAveragePercent !== null
+      ? Number((latestConfidencePercent - sectorAveragePercent).toFixed(1))
+      : null;
+  const sectorSampleSize =
+    typeof sectorScore?.sampleSize === "number" ? sectorScore.sampleSize : null;
+  const hasSectorSample = sectorSampleSize !== null;
+  const sectorSampleLabel = hasSectorSample ? `n=${sectorSampleSize}` : "n=NA";
 
   const tooltipContent = (
     <div className="space-y-3">
@@ -171,8 +190,15 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
       <div className="space-y-2 text-xs leading-relaxed text-slate-300">
         <p>
           <span className="font-semibold text-slate-100">Current score:</span>{" "}
-          {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "—"}
+          {formatPercent(latestConfidencePercent)}
         </p>
+        {sectorAveragePercent !== null ? (
+          <p>
+            <span className="font-semibold text-slate-100">Sector average:</span>{" "}
+            {formatPercent(sectorAveragePercent)}
+            {hasSectorSample ? ` (${sectorSampleLabel})` : ""}
+          </p>
+        ) : null}
         {strategy.investment_bounds ? (
           <p>
             <span className="font-semibold text-slate-100">Optimal range:</span> {strategy.investment_bounds}
@@ -211,12 +237,32 @@ export function StrategyCard({ strategy }: StrategyCardProps) {
       <div className="rounded-xl border border-slate-100 bg-slate-50 px-4 py-3 text-sm text-slate-600">
         <div className="flex items-center justify-between text-xs uppercase tracking-wide text-slate-400">
           <span>Current Score</span>
-          <span className="text-sm font-semibold text-slate-900">
-            {latestConfidencePercent !== null ? `${latestConfidencePercent}%` : "—"}
-          </span>
+          <span className="text-sm font-semibold text-slate-900">{formatPercent(latestConfidencePercent)}</span>
         </div>
+        {sectorAveragePercent !== null ? (
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 bg-white/80 px-3 py-2">
+            <div>
+              <span className="text-[11px] font-semibold uppercase tracking-wide text-slate-400">Sector Average</span>
+              <span className="block text-sm font-semibold text-slate-900">{formatPercent(sectorAveragePercent)}</span>
+            </div>
+            <div className="flex flex-col items-end text-xs text-slate-500">
+              <span className="text-[11px] uppercase tracking-wide text-slate-400">Sample</span>
+              <span className="text-sm font-medium text-slate-700">{sectorSampleLabel}</span>
+              {sectorPerformanceDelta !== null ? (
+                <span
+                  className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
+                    sectorPerformanceDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                  }`}
+                >
+                  {sectorPerformanceDelta >= 0 ? "+" : ""}
+                  {sectorPerformanceDelta.toFixed(1)} pts vs sector
+                </span>
+              ) : null}
+            </div>
+          </div>
+        ) : null}
         {strategy.score_guidance ? (
-          <p className="mt-2 text-xs leading-relaxed text-slate-500">{strategy.score_guidance}</p>
+          <p className="mt-3 text-xs leading-relaxed text-slate-500">{strategy.score_guidance}</p>
         ) : null}
       </div>
       {renderConfidenceChart(strategy)}

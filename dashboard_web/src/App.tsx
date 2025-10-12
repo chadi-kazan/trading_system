@@ -1,10 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import { BrowserRouter, NavLink, Route, Routes, useLocation, useNavigate } from "react-router-dom";
-import { fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
+import { fetchSectorScores, fetchStrategies, fetchSymbolAnalysis, searchSymbols } from "./api";
 import type { AggregatedSignal, StrategyInfo, StrategyScore, SymbolAnalysis, SymbolSearchResult } from "./types";
 import { SearchPanel } from "./components/SearchPanel";
 import { PriceChart } from "./components/PriceChart";
 import { StrategyCard } from "./components/StrategyCard";
+import { SignalComparisonPanel } from "./components/SignalComparisonPanel";
 import { AggregatedSignals } from "./components/AggregatedSignals";
 import { ScenarioCallouts } from "./components/ScenarioCallouts";
 import { FinalScoreChart } from "./components/FinalScoreChart";
@@ -73,13 +74,21 @@ function DashboardPage({
   const [searchResults, setSearchResults] = useState<SymbolSearchResult[]>([]);
   const [selectedSymbol, setSelectedSymbol] = useState<SymbolSearchResult | null>(null);
   const [analysis, setAnalysis] = useState<SymbolAnalysis | null>(null);
+  const [comparisonAnalyses, setComparisonAnalyses] = useState<Record<string, SymbolAnalysis>>({});
+  const [comparisonInputs, setComparisonInputs] = useState<{ primary: string; secondary: string }>({ primary: "", secondary: "" });
+  const [loadingComparison, setLoadingComparison] = useState(false);
+  const [comparisonError, setComparisonError] = useState<string | null>(null);
+  const [activeComparison, setActiveComparison] = useState<{ primary: string; secondary: string } | null>(null);
   const [loadingSearch, setLoadingSearch] = useState(false);
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [sectorScores, setSectorScores] = useState<Record<string, { average: number; sampleSize: number }> | null>(null);
+  const [sectorContext, setSectorContext] = useState<{ sector?: string | null; sampleSize: number } | null>(null);
   const [lastQuery, setLastQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<WatchlistStatus>(WATCHLIST_STATUSES[0]);
   const [pendingAutoSave, setPendingAutoSave] = useState<WatchlistStatus | null>(null);
 
+  const selectedSymbolKey = selectedSymbol?.symbol ? selectedSymbol.symbol.toUpperCase() : null;
   const aggregatedSignals: AggregatedSignal[] = analysis?.aggregated_signals ?? [];
   const annotations = useMemo(() => extractAnnotations(analysis?.strategies), [analysis?.strategies]);
   const strategyCards = useMemo(() => analysis?.strategies ?? [], [analysis]);
@@ -165,6 +174,10 @@ function DashboardPage({
         interval: "1d",
       });
       setAnalysis(data);
+      setComparisonAnalyses((prev) => ({
+        ...prev,
+        [symbol.toUpperCase()]: data,
+      }));
     } catch (err) {
       console.error(err);
       setError((err as Error).message);
@@ -172,6 +185,190 @@ function DashboardPage({
       setLoadingAnalysis(false);
     }
   };
+
+  const getAnalysisForSymbol = useCallback(
+    (symbol: string | null | undefined): SymbolAnalysis | undefined => {
+      if (!symbol) return undefined;
+      const key = symbol.toUpperCase();
+      if (selectedSymbolKey && key === selectedSymbolKey && analysis) {
+        return analysis;
+      }
+      return comparisonAnalyses[key];
+    },
+    [analysis, comparisonAnalyses, selectedSymbolKey],
+  );
+
+  const computeLatestStrategyScore = (payload: SymbolAnalysis | undefined, strategyName: string): number | null => {
+    if (!payload) return null;
+    const strategy = payload.strategies.find((item) => item.name === strategyName);
+    if (!strategy) return null;
+    const latest = strategy.signals.at(-1);
+    const confidence = typeof latest?.confidence === "number" ? latest.confidence : null;
+    if (confidence === null || Number.isNaN(confidence)) return null;
+    const clamped = Math.max(0, Math.min(confidence, 1));
+    return clamped * 100;
+  };
+
+  const computeLatestFinalScore = (payload: SymbolAnalysis | undefined): number | null => {
+    if (!payload) return null;
+    const latest = payload.aggregated_signals.at(-1);
+    const confidence = typeof latest?.confidence === "number" ? latest.confidence : null;
+    if (confidence === null || Number.isNaN(confidence)) return null;
+    const clamped = Math.max(0, Math.min(confidence, 1));
+    return clamped * 100;
+  };
+
+  const fetchComparisonAnalysis = useCallback(
+    async (symbol: string): Promise<SymbolAnalysis> => {
+      const key = (symbol || "").trim().toUpperCase();
+      if (!key) {
+        throw new Error("Enter a symbol to compare.");
+      }
+
+      if (selectedSymbolKey && key === selectedSymbolKey && analysis) {
+        setComparisonAnalyses((prev) => {
+          const existing = prev[key];
+          if (existing === analysis) {
+            return prev;
+          }
+          return { ...prev, [key]: analysis };
+        });
+        return analysis;
+      }
+
+      const cached = comparisonAnalyses[key];
+      if (cached) {
+        return cached;
+      }
+
+      const data = await fetchSymbolAnalysis({
+        symbol: key,
+        start: formatDate(THREE_YEARS_AGO),
+        end: formatDate(new Date()),
+        interval: "1d",
+      });
+      setComparisonAnalyses((prev) => ({
+        ...prev,
+        [key]: data,
+      }));
+      return data;
+    },
+    [analysis, comparisonAnalyses, selectedSymbolKey],
+  );
+
+  const handleCompareSymbols = useCallback(async () => {
+    const primary = (comparisonInputs.primary || "").trim().toUpperCase();
+    const secondary = (comparisonInputs.secondary || "").trim().toUpperCase();
+
+    if (!primary || !secondary) {
+      setComparisonError("Enter two symbols to compare.");
+      return;
+    }
+    if (primary === secondary) {
+      setComparisonError("Choose two different symbols to compare.");
+      return;
+    }
+
+    setLoadingComparison(true);
+    setComparisonError(null);
+    try {
+      await Promise.all([fetchComparisonAnalysis(primary), fetchComparisonAnalysis(secondary)]);
+      setActiveComparison({ primary, secondary });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : "Unable to run comparison.";
+      setComparisonError(message);
+    } finally {
+      setLoadingComparison(false);
+    }
+  }, [comparisonInputs, fetchComparisonAnalysis]);
+
+  const handleComparisonInputChange = useCallback((field: "primary" | "secondary", value: string) => {
+    setComparisonInputs((prev) => ({
+      ...prev,
+      [field]: value.toUpperCase(),
+    }));
+    setComparisonError(null);
+  }, []);
+
+  const handleSwapComparison = useCallback(() => {
+    setComparisonInputs((prev) => ({
+      primary: prev.secondary,
+      secondary: prev.primary,
+    }));
+    setComparisonError(null);
+  }, []);
+
+  useEffect(() => {
+    if (!selectedSymbol) {
+      setSectorScores(null);
+      setSectorContext(null);
+      return;
+    }
+
+    fetchSectorScores(selectedSymbol.symbol)
+      .then((response) => {
+        const scores: Record<string, { average: number; sampleSize: number }> = {};
+        response.strategy_scores.forEach((entry) => {
+          scores[entry.strategy] = { average: entry.average_score, sampleSize: entry.sample_size };
+        });
+        setSectorScores(scores);
+        setSectorContext({ sector: response.sector, sampleSize: response.sample_size });
+      })
+      .catch(() => {
+        setSectorScores(null);
+        setSectorContext(null);
+      });
+  }, [selectedSymbol?.symbol]);
+
+  useEffect(() => {
+    if (selectedSymbol?.symbol) {
+      const upper = selectedSymbol.symbol.toUpperCase();
+      setComparisonInputs((prev) => ({
+        ...prev,
+        primary: upper,
+      }));
+      setActiveComparison((prev) => {
+        if (prev && prev.primary === upper) {
+          return prev;
+        }
+        return null;
+      });
+      setComparisonError(null);
+    }
+  }, [selectedSymbol?.symbol]);
+
+  const comparisonRows = useMemo(() => {
+    if (!activeComparison) return [];
+    const primaryAnalysis = getAnalysisForSymbol(activeComparison.primary);
+    const secondaryAnalysis = getAnalysisForSymbol(activeComparison.secondary);
+    if (!primaryAnalysis || !secondaryAnalysis) return [];
+
+    return strategiesMeta.map((meta) => {
+      const primaryScore = computeLatestStrategyScore(primaryAnalysis, meta.name);
+      const secondaryScore = computeLatestStrategyScore(secondaryAnalysis, meta.name);
+      const difference =
+        primaryScore !== null && secondaryScore !== null ? primaryScore - secondaryScore : null;
+      return {
+        strategy: meta.name,
+        label: meta.label,
+        primaryScore,
+        secondaryScore,
+        difference,
+      };
+    });
+  }, [activeComparison, getAnalysisForSymbol, strategiesMeta]);
+
+  const comparisonSummary = useMemo(() => {
+    if (!activeComparison) return null;
+    const primaryAnalysis = getAnalysisForSymbol(activeComparison.primary);
+    const secondaryAnalysis = getAnalysisForSymbol(activeComparison.secondary);
+    if (!primaryAnalysis || !secondaryAnalysis) return null;
+
+    return {
+      primaryScore: computeLatestFinalScore(primaryAnalysis),
+      secondaryScore: computeLatestFinalScore(secondaryAnalysis),
+    };
+  }, [activeComparison, getAnalysisForSymbol]);
 
   const handleSelectSymbol = (result: SymbolSearchResult) => {
     setSelectedSymbol(result);
@@ -212,6 +409,11 @@ function DashboardPage({
               <p className="text-sm text-slate-500">
                 Strategies loaded: {strategiesMeta.length} - Data source: Yahoo Finance + Alpha Vantage fundamentals
               </p>
+              {sectorContext ? (
+                <p className="text-xs text-slate-400">
+                  Sector snapshot: {sectorContext.sector ?? "Unknown"} ({sectorContext.sampleSize} symbols)
+                </p>
+              ) : null}
             </div>
             {selectedSymbol && (
               <div className="flex flex-wrap items-center gap-3">
@@ -268,6 +470,19 @@ function DashboardPage({
           </div>
         </div>
 
+        <SignalComparisonPanel
+          inputs={comparisonInputs}
+          onInputChange={handleComparisonInputChange}
+          onSwap={handleSwapComparison}
+          onCompare={handleCompareSymbols}
+          loading={loadingComparison}
+          error={comparisonError}
+          rows={comparisonRows}
+          summary={comparisonSummary}
+          activePair={activeComparison}
+          strategyOrder={strategiesMeta}
+        />
+
         {error && (
           <div className="rounded-2xl border border-rose-200 bg-rose-50 px-6 py-4 text-sm text-rose-700 shadow-sm shadow-rose-200/40">
             <strong className="font-semibold">API message:</strong> {error}
@@ -279,7 +494,11 @@ function DashboardPage({
             <PriceChart data={analysis.price_bars} annotations={annotations} latestAggregated={latestAggregated} />
             <div className="grid gap-6 md:grid-cols-2">
               {strategyCards.map((strategy) => (
-                <StrategyCard key={strategy.name} strategy={strategy} />
+                <StrategyCard
+                  key={strategy.name}
+                  strategy={strategy}
+                  sectorScore={sectorScores?.[strategy.name] ?? null}
+                />
               ))}
             </div>
           </>
