@@ -217,7 +217,7 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
   const showSectorContext = expanded && (sectorAveragePercent !== null || strategy.score_guidance);
 
   return (
-    <article className="flex min-h-[240px] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+    <article className="flex min-h-[220px] flex-col gap-4 rounded-2xl border border-slate-200 bg-white p-5 shadow-sm shadow-slate-200/60 sm:min-h-[240px] sm:p-6">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div className="min-w-0 flex-1">
           <div className="flex items-center gap-2">

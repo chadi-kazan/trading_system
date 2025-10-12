@@ -159,9 +159,22 @@ Ask before implementing because we will expand as we see signals improve
 - [] Alternative Data Hooks: Layer in sector-specific alternative metrics (web traffic, app downloads, satellite data) for your highest-conviction names. Even a simple Google Trends momentum score can be a useful confirm/deny slider.
 - [] Risk-Parity Watchlist: Build a meta-filter that looks for diversification across factor exposures (quality, value, growth, momentum). That way your watchlist avoids accidental concentration in, say, all high-beta tech setups.
 
+## Deployment Runbook
+- Provision infrastructure on a low-cost platform (Render free tier or Railway starter) to host the FastAPI backend, React build, and managed PostgreSQL.
+- Prepare a production configuration profile (environment variables, database URL, Alpha Vantage key, storage paths) and commit sample `.env.example`.
+- Containerise the backend with a minimal Python 3.11 image, install deps from `requirements.txt`, and configure gunicorn/uvicorn workers.
+- Build the React frontend via Vite, publish the static bundle to the chosen CDN (Render static site, Netlify, or Cloudflare Pages), and point it to the backend URL.
+- Enable a managed PostgreSQL instance, run SQLModel migrations/initialisers, and seed baseline data (watchlist tables, strategy metadata).
+- Set up automated deploy hooks (Render auto-deploy from Git main), plus cron/scheduler for fundamentals refresh if needed.
+- Implement logging/monitoring using the platform’s dashboard (Render logs) and configure health check endpoints.
+- Document rollback/restore steps and expected monthly cost (<$10 using free tiers where possible).
+
 ## Future Analytics Backlog
 - Volatility-adjusted sizing and position throttling to complement trend overlays.
 - Cross-sector/style relative-strength rotation layer to prioritise opportunity sets.
 - Insider and institutional flow indicators to filter out weak conviction setups.
 - Alternative data hooks (traffic, downloads, thematic signals) for highest-conviction names.
 - Risk-parity style watchlist guardrail to balance factor exposures.
+
+## Frontend Polish
+- [] Responsive web app pass: ensure key pages (search, dashboard carousel, strategy cards, watchlist) render comfortably on mobile breakpoints, collapsing grids and tightening spacing as needed.

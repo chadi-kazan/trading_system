@@ -853,7 +853,7 @@ function SignalCarousel({
   };
 
   return (
-    <section className="flex min-h-[360px] flex-col rounded-2xl border border-slate-200 bg-white p-6 shadow-sm shadow-slate-200/60">
+    <section className="flex min-h-[320px] flex-col rounded-2xl border border-slate-200 bg-white p-4 shadow-sm shadow-slate-200/60 sm:p-6 md:min-h-[360px]">
       <div className="flex flex-wrap items-start justify-between gap-4">
         <div>
           <h2 className="text-lg font-semibold text-slate-900">{activeSlide.title}</h2>
@@ -954,14 +954,14 @@ function AppLayout({
   return (
     <div className="min-h-screen bg-slate-50">
       <header className="border-b border-slate-200 bg-slate-900 text-white">
-        <div className="mx-auto flex flex-wrap items-center justify-between gap-4 px-6 py-5">
+        <div className="mx-auto flex flex-wrap items-center justify-between gap-4 px-4 py-5 sm:px-6">
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Small-Cap Growth Toolkit</h1>
             <p className="text-xs text-slate-300">
               Search, analyse, and monitor actionable signals across CAN SLIM, Zanger, trend-following, and Livermore models.
             </p>
           </div>
-          <nav className="flex flex-wrap gap-2 text-sm font-medium">
+          <nav className="flex w-full flex-row flex-wrap gap-2 overflow-x-auto text-sm font-medium sm:w-auto">
             {navLinks.map((link) => (
               <NavLink
                 key={link.to}
