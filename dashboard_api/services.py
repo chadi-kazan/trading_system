@@ -685,6 +685,7 @@ class BaseMomentumService:
                 weighting=weights,
             )
         )
+        self._regime_analyzer = MarketRegimeAnalyzer(self.price_provider)
 
         self._symbols: Optional[List[str]] = None
         self._metadata: Optional[Dict[str, Dict[str, Optional[str]]]] = None
