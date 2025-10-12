@@ -83,7 +83,7 @@ function DashboardPage({
   const [loadingAnalysis, setLoadingAnalysis] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [sectorScores, setSectorScores] = useState<Record<string, { average: number; sampleSize: number }> | null>(null);
-  const [sectorContext, setSectorContext] = useState<{ sector?: string | null; sampleSize: number } | null>(null);
+  const [sectorContext, setSectorContext] = useState<{ sector?: string | null; sampleSize: number; universe?: string | null } | null>(null);
   const [lastQuery, setLastQuery] = useState("");
   const [selectedStatus, setSelectedStatus] = useState<WatchlistStatus>(WATCHLIST_STATUSES[0]);
   const [pendingAutoSave, setPendingAutoSave] = useState<WatchlistStatus | null>(null);
@@ -312,7 +312,11 @@ function DashboardPage({
           scores[entry.strategy] = { average: entry.average_score, sampleSize: entry.sample_size };
         });
         setSectorScores(scores);
-        setSectorContext({ sector: response.sector, sampleSize: response.sample_size });
+        setSectorContext({
+          sector: response.sector,
+          sampleSize: response.sample_size,
+          universe: response.universe ?? null,
+        });
       })
       .catch(() => {
         setSectorScores(null);
@@ -410,9 +414,21 @@ function DashboardPage({
                 Strategies loaded: {strategiesMeta.length} - Data source: Yahoo Finance + Alpha Vantage fundamentals
               </p>
               {sectorContext ? (
-                <p className="text-xs text-slate-400">
-                  Sector snapshot: {sectorContext.sector ?? "Unknown"} ({sectorContext.sampleSize} symbols)
-                </p>
+                sectorContext.sampleSize > 0 ? (
+                  <p className="text-xs text-slate-400">
+                    Peer snapshot: {sectorContext.sector ?? "Unknown"} ·{" "}
+                    {sectorContext.universe === "russell"
+                      ? "Small-cap (Russell 2000)"
+                      : sectorContext.universe === "sp500"
+                      ? "Large-cap (S&P 500)"
+                      : "Tracked universe"}{" "}
+                    ({sectorContext.sampleSize} symbols)
+                  </p>
+                ) : (
+                  <p className="text-xs text-amber-500">
+                    Peer snapshot unavailable — update sector metadata for this universe to populate averages.
+                  </p>
+                )
               ) : null}
             </div>
             {selectedSymbol && (

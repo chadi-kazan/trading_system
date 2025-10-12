@@ -31,6 +31,8 @@ from .schemas import (
     AggregatedSignalPayload,
     MomentumEntry,
     MomentumResponse,
+    SectorScoreResponse,
+    SectorStrategyScore,
     PriceBar,
     StrategyAnalysis,
     StrategyInfo,
@@ -364,6 +366,7 @@ class BaseMomentumService:
         self._symbols: Optional[List[str]] = None
         self._metadata: Optional[Dict[str, Dict[str, Optional[str]]]] = None
         self._cache: Dict[Tuple[str, int], Tuple[float, MomentumResponse]] = {}
+        self._entries_cache: Dict[str, Tuple[float, List[MomentumEntry], int, int]] = {}
 
     # ------------------------------------------------------------------
     # Public API
@@ -381,9 +384,56 @@ class BaseMomentumService:
         if cached and now - cached[0] <= self.CACHE_TTL_SECONDS:
             return cached[1].model_copy(deep=True)
 
+        entries, universe_size, skipped = self._gather_entries(tf)
+        if not entries:
+            raise RuntimeError("Failed to compute momentum for any symbols")
+
+        sorted_entries = sorted(entries, key=lambda item: item.change_percent, reverse=True)
+        top_gainers = sorted_entries[:capped_limit]
+
+        losers_sorted = sorted(entries, key=lambda item: item.change_percent)
+        negative_losers = [entry for entry in losers_sorted if entry.change_percent < 0]
+        if negative_losers:
+            top_losers = negative_losers[:capped_limit]
+        else:
+            top_losers = losers_sorted[:capped_limit]
+
+        baseline_entry = next((entry for entry in entries if entry.symbol == self.baseline_symbol), None)
+
+        response = MomentumResponse(
+            timeframe=tf,
+            generated_at=datetime.utcnow(),
+            universe_size=universe_size,
+            evaluated_symbols=len(entries),
+            skipped_symbols=skipped,
+            baseline_symbol=self.baseline_symbol if baseline_entry else None,
+            baseline_change_percent=baseline_entry.change_percent if baseline_entry else None,
+            baseline_last_price=baseline_entry.last_price if baseline_entry else None,
+            top_gainers=top_gainers,
+            top_losers=top_losers,
+        )
+
+        self._cache[cache_key] = (now, response)
+        return response.model_copy(deep=True)
+
+    def get_entries(self, timeframe: str = "week") -> List[MomentumEntry]:
+        entries, _, _ = self._gather_entries((timeframe or "").strip().lower())
+        return [entry.model_copy(deep=True) for entry in entries]
+
+    def _gather_entries(self, timeframe: str) -> Tuple[List[MomentumEntry], int, int]:
+        tf = (timeframe or "").strip().lower()
+        if tf not in self.TIMEFRAME_CONFIG:
+            raise ValueError(f"Unsupported timeframe '{timeframe}'. Choose from day, week, month, ytd.")
+
+        now = time.time()
+        cached = self._entries_cache.get(tf)
+        if cached and now - cached[0] <= self.CACHE_TTL_SECONDS:
+            _, cached_entries, universe_size, skipped = cached
+            return ([entry.model_copy(deep=True) for entry in cached_entries], universe_size, skipped)
+
         symbols = self._load_symbols()
         if not symbols:
-            raise RuntimeError("No symbols available for analysis")
+            return [], 0, 0
 
         end_date = date.today()
         start_date = self._compute_start_date(end_date, tf)
@@ -398,36 +448,9 @@ class BaseMomentumService:
                 continue
             entries.append(entry)
 
-        if not entries:
-            raise RuntimeError("Failed to compute momentum for any symbols")
-
-        entries.sort(key=lambda item: item.change_percent, reverse=True)
-        top_gainers = entries[:capped_limit]
-
-        losers_sorted = sorted(entries, key=lambda item: item.change_percent)
-        negative_losers = [entry for entry in losers_sorted if entry.change_percent < 0]
-        if negative_losers:
-            top_losers = negative_losers[:capped_limit]
-        else:
-            top_losers = losers_sorted[:capped_limit]
-
-        baseline_entry = next((entry for entry in entries if entry.symbol == self.baseline_symbol), None)
-
-        response = MomentumResponse(
-            timeframe=tf,
-            generated_at=datetime.utcnow(),
-            universe_size=len(symbols),
-            evaluated_symbols=len(entries),
-            skipped_symbols=skipped,
-            baseline_symbol=self.baseline_symbol if baseline_entry else None,
-            baseline_change_percent=baseline_entry.change_percent if baseline_entry else None,
-            baseline_last_price=baseline_entry.last_price if baseline_entry else None,
-            top_gainers=top_gainers,
-            top_losers=top_losers,
-        )
-
-        self._cache[cache_key] = (now, response)
-        return response.model_copy(deep=True)
+        cache_entries = [entry.model_copy(deep=True) for entry in entries]
+        self._entries_cache[tf] = (now, cache_entries, len(symbols), skipped)
+        return entries, len(symbols), skipped
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -725,6 +748,92 @@ def _ensure_additional_indicators(strategy_map: Dict[str, Strategy], frame: pd.D
     return enriched
 
 
-__all__ = ["SignalService", "RussellMomentumService", "SPMomentumService", "RateLimitError"]
+
+class MomentumAnalyticsService:
+    """Higher-level momentum analytics helpers (sector averages, etc.)."""
+
+    def __init__(self, russell_service: RussellMomentumService, sp_service: SPMomentumService) -> None:
+        self._services: List[Tuple[str, BaseMomentumService]] = [
+            ("russell", russell_service),
+            ("sp500", sp_service),
+        ]
+
+    def get_sector_scores(self, symbol: str, timeframe: str = "week") -> SectorScoreResponse:
+        symbol_clean = (symbol or "").strip().upper()
+        if not symbol_clean:
+            raise ValueError("Symbol must not be empty")
+
+        target_sector: Optional[str] = None
+        target_universe: Optional[str] = None
+        symbol_entry: Optional[MomentumEntry] = None
+        universe_cache: Dict[str, List[MomentumEntry]] = {}
+
+        for universe, service in self._services:
+            try:
+                entries = service.get_entries(timeframe)
+            except ValueError:
+                continue
+            universe_cache[universe] = entries
+            match = next((entry for entry in entries if entry.symbol.upper() == symbol_clean), None)
+            if match and symbol_entry is None:
+                symbol_entry = match
+                target_sector = match.sector
+                target_universe = universe
+
+        if symbol_entry is None:
+            raise ValueError("Symbol not found in tracked universes")
+
+        if not target_sector:
+            return SectorScoreResponse(
+                symbol=symbol_clean,
+                sector=None,
+                universe=target_universe,
+                timeframe=timeframe,
+                sample_size=0,
+                strategy_scores=[],
+            )
+
+        primary_entries = [
+            entry
+            for entry in universe_cache.get(target_universe or "", [])
+            if entry.sector == target_sector
+        ]
+
+        if not primary_entries:
+            return SectorScoreResponse(
+                symbol=symbol_clean,
+                sector=target_sector,
+                universe=target_universe,
+                timeframe=timeframe,
+                sample_size=0,
+                strategy_scores=[],
+            )
+
+        aggregated: Dict[str, List[float]] = {}
+        for entry in primary_entries:
+            for strategy_name, score in entry.strategy_scores.items():
+                aggregated.setdefault(strategy_name, []).append(score)
+
+        strategy_scores = [
+            SectorStrategyScore(
+                strategy=name,
+                average_score=sum(values) / len(values),
+                sample_size=len(values),
+            )
+            for name, values in aggregated.items()
+            if values
+        ]
+
+        return SectorScoreResponse(
+            symbol=symbol_clean,
+            sector=target_sector,
+            universe=target_universe,
+            timeframe=timeframe,
+            sample_size=len(primary_entries),
+            strategy_scores=strategy_scores,
+        )
+
+
+__all__ = ["SignalService", "RussellMomentumService", "SPMomentumService", "MomentumAnalyticsService", "RateLimitError"]
 
 
