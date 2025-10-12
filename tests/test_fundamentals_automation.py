@@ -71,6 +71,16 @@ def test_refresh_once_runs_validation_and_returns_outcome(automation_config):
         def last_skipped_symbols(self):
             return ["MISS"]
 
+        def collect_metadata_frame(self, symbols):
+            return pd.DataFrame(
+                {
+                    "symbol": [sym for sym in symbols],
+                    "name": [f"Name {sym}" for sym in symbols],
+                    "sector": ["Tech"] * len(symbols),
+                    "fetched_at": [datetime.utcnow().isoformat()] * len(symbols),
+                }
+            )
+
     outcome = refresh_once(
         config,
         schedule,
@@ -83,6 +93,9 @@ def test_refresh_once_runs_validation_and_returns_outcome(automation_config):
     assert outcome.universe_size == 2
     assert outcome.snapshot_path is not None
     assert outcome.skipped_symbols == ["MISS"]
+    metadata_file = config.storage.universe_dir / "sector_metadata.csv"
+    assert metadata_file.exists()
+    assert "symbol" in metadata_file.read_text()
 
 
 def test_refresh_once_raises_validation_error_when_threshold_not_met(automation_config):
@@ -111,6 +124,9 @@ def test_refresh_once_raises_validation_error_when_threshold_not_met(automation_
 
         def last_skipped_symbols(self):
             return []
+
+        def collect_metadata_frame(self, symbols):
+            return pd.DataFrame(columns=["symbol", "name", "sector", "fetched_at"])
 
     with pytest.raises(ValidationError):
         refresh_once(
@@ -163,3 +179,4 @@ def test_run_scheduled_refresh_run_once_delegates(monkeypatch, automation_config
     assert calls["config"] is config
     assert calls["schedule"] == schedule
     assert calls["kwargs"]["limit"] == 50
+    assert "include_sp500" in calls["kwargs"]

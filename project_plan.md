@@ -1,6 +1,11 @@
 # Project Plan: Small-Cap Growth Stock Trading System
 
-## System Reconstruction Blueprint\n### Business Objective\nDeliver a weekly-use research assistant for novice-to-intermediate small-cap investors. The system ingests Yahoo Finance price data and Alpha Vantage fundamentals, applies curated growth strategies (CAN SLIM, Dan Zanger cup-handle, EMA trend following, Livermore breakout), scores opportunities, simulates backtests, and presents actionable dashboards plus education so users understand each signal. Saved watchlist entries track conviction level, status, and score breakdown for ongoing monitoring.\n\n### Implementation Steps
+## System Reconstruction Blueprint
+
+### Business Objective
+Deliver a weekly-use research assistant for novice-to-intermediate small-cap investors. The system ingests Yahoo Finance price data and Alpha Vantage fundamentals, applies curated growth strategies (CAN SLIM, Dan Zanger cup-handle, EMA trend following, Livermore breakout), scores opportunities, simulates backtests, and presents actionable dashboards plus education so users understand each signal. Saved watchlist entries track conviction level, status, and score breakdown for ongoing monitoring.
+
+### Implementation Steps
 1. Establish Python 3.11 environment with FastAPI, Uvicorn, pandas, yfinance, requests, numpy, and pytest per `requirements.txt`. Ensure storage directories align with `config/default_settings.json` (price cache, universe snapshots, signals, portfolio).
 2. Implement FastAPI backend (`dashboard_api/`):
    - `app.py` creates the app, enables CORS for the React host, and registers the `/api` router.
@@ -24,6 +29,8 @@
 - After every feature implementation suggest a git commit command that i can copy to commit the files you changed.
 - Update the README.md file if necessary to document new patterns/usage after every implementation.
 - constantly review and update the project plan to add new tasks to it and refine the requirements as i give you instructions. add any instructions i give you here as well when required.
+- at the end of every implementation step, or whenever suitable, give me a git command that i can copy/paste in the console to commit the changes with a message that explains what you did.
+- constantly review and update the business objective section above when new features are added to make sure it does document all the objectives of the app.
 
 ## Phase 0: Planning & Baseline
 - [x] ~~Review instructions and capture key constraints (Deliverable: notes in this plan; Completed: 2025-09-21).~~
@@ -58,7 +65,8 @@
   - [x] ~~Introduce seed candidate loader and smoke integration (Deliverable: `universe/candidates.py`; Notes: fallback list + optional CSV override).~~
   - [x] ~~Add unit tests for seed candidate loader (Deliverable: `tests/test_candidates.py`; Result: CSV parsing & fallback coverage).~~
   - [x] ~~Add automated unit tests for universe filters (Deliverable: `tests/test_universe_builder.py`; Result: mock ticker injections).~~
-  - [x] ~~Capture skipped tickers and relax float/spread handling (Deliverable: `universe/builder.py`; Notes: diagnostics for missing fundamentals).~~
+- [x] ~~Capture skipped tickers and relax float/spread handling (Deliverable: `universe/builder.py`; Notes: diagnostics for missing fundamentals).~~
+- [x] Extended fundamentals refresh pipeline to maintain Russell + S&P sector metadata snapshots (Deliverable: automation update producing `sector_metadata.csv`; Completed: 2025-10-08).
 
 ## Phase 3: Strategy Modules (MVP Signals)
 - [x] ~~Deliver Dan Zanger cup-and-handle detector (Deliverable: module + unit tests on synthetic data; Completed: 2025-09-21; Notes: `strategies/dan_zanger.py` with configurable params and pytest coverage).~~

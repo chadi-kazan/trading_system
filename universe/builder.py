@@ -69,6 +69,8 @@ class UniverseBuilder:
         self._ticker_factory = ticker_factory or yf.Ticker
         self._last_skipped: list[str] = []
         self._last_snapshot_path: Path | None = None
+        self._last_snapshots: list[SymbolSnapshot] = []
+        self._last_snapshot_frame: pd.DataFrame | None = None
 
     # ------------------------------------------------------------------
     # Public API
@@ -82,30 +84,14 @@ class UniverseBuilder:
         """Fetch fundamentals, apply screening filters, and return qualifying symbols."""
 
         as_of = as_of or date.today()
-        snapshots: List[SymbolSnapshot] = []
-        skipped_errors: list[str] = []
-        skipped_missing: list[str] = []
         self._last_snapshot_path = None
-        for raw_symbol in symbols:
-            symbol = raw_symbol.strip().upper()
-            if not symbol:
-                continue
-            try:
-                snapshot = self._get_snapshot(symbol)
-            except Exception as exc:  # pylint: disable=broad-except
-                LOGGER.warning("Skipping %s due to fetch error: %s", symbol, exc)
-                skipped_errors.append(symbol)
-                continue
-            if snapshot is None:
-                skipped_missing.append(symbol)
-                continue
-            snapshots.append(snapshot)
-
+        snapshots, skipped_errors, skipped_missing = self._collect_snapshots(symbols)
         self._last_skipped = skipped_errors + skipped_missing
         if self._last_skipped:
             LOGGER.info("Skipped %s symbols (errors=%s, missing_data=%s)", len(self._last_skipped), len(skipped_errors), len(skipped_missing))
 
         frame = pd.DataFrame(snapshot.to_dict() for snapshot in snapshots)
+        self._last_snapshot_frame = frame.copy()
         if frame.empty:
             LOGGER.warning("No valid symbols found for universe build")
             return frame
@@ -133,10 +119,51 @@ class UniverseBuilder:
         """Return the path written during the most recent persisted build."""
         return self._last_snapshot_path
 
+    def last_snapshot_dataframe(self) -> pd.DataFrame:
+        """Return the most recently fetched snapshot frame (pre-filter)."""
+        if self._last_snapshot_frame is None:
+            return pd.DataFrame()
+        return self._last_snapshot_frame.copy()
+
+    def collect_metadata_frame(self, symbols: Iterable[str]) -> pd.DataFrame:
+        """Fetch and return raw snapshot metadata for the supplied symbols."""
+        snapshots, skipped_errors, skipped_missing = self._collect_snapshots(symbols)
+        self._last_skipped = skipped_errors + skipped_missing
+        frame = pd.DataFrame(snapshot.to_dict() for snapshot in snapshots)
+        self._last_snapshot_frame = frame.copy()
+        return frame
+
 
     def _universe_filename(self, as_of: date) -> Path:
         timestamp = datetime.utcnow().strftime("%Y%m%d_%H%M%S")
         return self.universe_dir / f"universe_{as_of.isoformat()}_{timestamp}.csv"
+
+    def _collect_snapshots(
+        self,
+        symbols: Iterable[str],
+    ) -> tuple[List[SymbolSnapshot], list[str], list[str]]:
+        snapshots: List[SymbolSnapshot] = []
+        skipped_errors: list[str] = []
+        skipped_missing: list[str] = []
+        self._last_snapshots = []
+        self._last_snapshot_frame = None
+        for raw_symbol in symbols:
+            symbol = raw_symbol.strip().upper()
+            if not symbol:
+                continue
+            try:
+                snapshot = self._get_snapshot(symbol)
+            except Exception as exc:  # pylint: disable=broad-except
+                LOGGER.warning("Skipping %s due to fetch error: %s", symbol, exc)
+                skipped_errors.append(symbol)
+                continue
+            if snapshot is None:
+                skipped_missing.append(symbol)
+                continue
+            snapshots.append(snapshot)
+
+        self._last_snapshots = list(snapshots)
+        return snapshots, skipped_errors, skipped_missing
 
     def _get_snapshot(self, symbol: str) -> SymbolSnapshot | None:
         cached = self._read_cache(symbol)

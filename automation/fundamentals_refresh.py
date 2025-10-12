@@ -11,6 +11,8 @@ from typing import Callable, Optional, Sequence
 
 from zoneinfo import ZoneInfo
 
+import pandas as pd
+
 from data_pipeline import refresh_fundamentals_cache
 from trading_system.config_manager import (
     FundamentalsRefreshAutomationConfig,
@@ -18,7 +20,12 @@ from trading_system.config_manager import (
     TradingSystemConfig,
 )
 from universe.builder import UniverseBuilder
-from universe.candidates import RUSSELL_2000_PATH, load_seed_candidates
+from universe.candidates import (
+    RUSSELL_2000_PATH,
+    SP500_PATH,
+    load_seed_candidates,
+    load_sp500_candidates,
+)
 
 LOGGER = logging.getLogger(__name__)
 
@@ -119,6 +126,7 @@ def refresh_once(
     seed_path: Path | None = None,
     symbols: Sequence[str] | None = None,
     include_russell: Optional[bool] = None,
+    include_sp500: Optional[bool] = None,
     limit: Optional[int] = None,
     throttle: Optional[float] = None,
     seed_loader: Callable[[Path | None, Sequence[Path]], list[str]] = load_seed_candidates,
@@ -132,6 +140,7 @@ def refresh_once(
         raise ValueError("Alpha Vantage API key is required to refresh fundamentals")
 
     include_russell = schedule.include_russell if include_russell is None else include_russell
+    include_sp500 = schedule.include_sp500 if include_sp500 is None else include_sp500
     limit = schedule.limit if limit is None else limit
     throttle_seconds = schedule.throttle if throttle is None else throttle
 
@@ -146,6 +155,10 @@ def refresh_once(
 
     if limit is not None and limit > 0:
         base_symbols = base_symbols[:limit]
+
+    sp500_symbols: list[str] = []
+    if include_sp500:
+        sp500_symbols = load_sp500_candidates()
 
     refreshed = refresh_fn(
         symbols=base_symbols,
@@ -187,6 +200,35 @@ def refresh_once(
                     f"Universe validation size {universe_size or 0} fell below minimum {validation_cfg.min_universe_size}"
                 )
 
+    metadata_frames: list[pd.DataFrame] = []
+    try:
+        smallcap_label = "russell" if include_russell else "small_cap"
+        smallcap_metadata = _collect_sector_metadata(
+            config=config,
+            builder_factory=builder_factory,
+            symbols=base_symbols,
+            universe_label=smallcap_label,
+        )
+        if not smallcap_metadata.empty:
+            metadata_frames.append(smallcap_metadata)
+
+        if include_sp500 and sp500_symbols:
+            sp500_metadata = _collect_sector_metadata(
+                config=config,
+                builder_factory=builder_factory,
+                symbols=sp500_symbols,
+                universe_label="sp500",
+            )
+            if not sp500_metadata.empty:
+                metadata_frames.append(sp500_metadata)
+
+        metadata_path = _write_sector_metadata(config.storage.universe_dir, metadata_frames)
+        if metadata_path:
+            total_symbols = sum(len(frame) for frame in metadata_frames)
+            LOGGER.info("Updated sector metadata (%s symbols) at %s", total_symbols, metadata_path)
+    except Exception:  # pylint: disable=broad-except
+        LOGGER.exception("Failed to update sector metadata snapshot")
+
     return RefreshOutcome(
         refreshed=refreshed,
         universe_size=universe_size,
@@ -203,6 +245,7 @@ def run_scheduled_refresh(
     max_iterations: Optional[int] = None,
     seed_path: Path | None = None,
     include_russell: Optional[bool] = None,
+    include_sp500: Optional[bool] = None,
     limit: Optional[int] = None,
     throttle: Optional[float] = None,
     sleep_fn: _SleepFunction = time.sleep,
@@ -220,6 +263,7 @@ def run_scheduled_refresh(
                 schedule,
                 seed_path=seed_path,
                 include_russell=include_russell,
+                include_sp500=include_sp500,
                 limit=limit,
                 throttle=throttle,
             )
@@ -253,6 +297,52 @@ def run_scheduled_refresh(
         iterations += 1
         if max_iterations is not None and iterations >= max_iterations:
             break
+
+
+def _collect_sector_metadata(
+    *,
+    config: TradingSystemConfig,
+    builder_factory: Callable[[TradingSystemConfig], UniverseBuilder],
+    symbols: Sequence[str],
+    universe_label: str,
+) -> pd.DataFrame:
+    if not symbols:
+        return pd.DataFrame()
+    builder = builder_factory(config)
+    frame = builder.collect_metadata_frame(symbols)
+    if frame.empty:
+        return frame
+    working = frame.copy()
+    working["symbol"] = working["symbol"].astype(str).str.upper()
+    working["universe"] = universe_label
+    return working
+
+
+def _write_sector_metadata(universe_dir: Path, frames: Sequence[pd.DataFrame]) -> Path | None:
+    if not frames:
+        return None
+    combined = pd.concat(frames, ignore_index=True)
+    if combined.empty:
+        return None
+
+    combined = combined.dropna(subset=["symbol"])
+    if combined.empty:
+        return None
+
+    combined["symbol"] = combined["symbol"].astype(str).str.upper()
+    combined = combined.sort_values(by=["symbol", "fetched_at"], ascending=[True, False])
+    combined = combined.drop_duplicates(subset=["symbol"], keep="first")
+
+    required_columns = ["symbol", "name", "sector", "universe", "fetched_at"]
+    for column in required_columns:
+        if column not in combined.columns:
+            combined[column] = pd.NA
+    combined = combined[required_columns]
+
+    target = universe_dir / "sector_metadata.csv"
+    target.parent.mkdir(parents=True, exist_ok=True)
+    combined.to_csv(target, index=False)
+    return target
 
 
 __all__ = [

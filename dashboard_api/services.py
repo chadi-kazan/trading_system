@@ -643,6 +643,7 @@ class RussellMomentumService(BaseMomentumService):
                 universe_dir / "seed_candidates.csv",
                 universe_dir / "yahoo_small_caps.csv",
                 universe_dir / "russell_2000.csv",
+                universe_dir / "sector_metadata.csv",
             ],
             config=config_obj,
         )
@@ -660,6 +661,7 @@ class SPMomentumService(BaseMomentumService):
             metadata_sources=[
                 universe_dir / "seed_candidates.csv",
                 universe_dir / "sp500.csv",
+                universe_dir / "sector_metadata.csv",
             ],
             config=config_obj,
         )

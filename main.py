@@ -608,6 +608,16 @@ def handle_schedule_fundamentals(args: argparse.Namespace, ctx: AppContext) -> i
     if args.skip_russell:
         include_russell = False
 
+    if getattr(args, "include_sp500", False) and getattr(args, "skip_sp500", False):
+        logger.error("Cannot specify both --include-sp500 and --skip-sp500.")
+        return 1
+
+    include_sp500 = getattr(schedule_cfg, "include_sp500", False)
+    if getattr(args, "include_sp500", False):
+        include_sp500 = True
+    if getattr(args, "skip_sp500", False):
+        include_sp500 = False
+
     if args.throttle is not None and args.throttle < 0:
         logger.error("Throttle must be non-negative")
         return 1
@@ -628,6 +638,7 @@ def handle_schedule_fundamentals(args: argparse.Namespace, ctx: AppContext) -> i
             max_iterations=args.max_iterations,
             seed_path=seed_path,
             include_russell=include_russell,
+            include_sp500=include_sp500,
             limit=limit,
             throttle=args.throttle,
         )
@@ -801,6 +812,8 @@ def build_parser() -> argparse.ArgumentParser:
     schedule.add_argument("--seed-candidates", type=Path, help="Optional seed candidates CSV override")
     schedule.add_argument("--include-russell", action="store_true", help="Include Russell 2000 constituents for refresh regardless of config")
     schedule.add_argument("--skip-russell", action="store_true", help="Exclude Russell 2000 constituents even if enabled in config")
+    schedule.add_argument("--include-sp500", action="store_true", help="Include S&P 500 constituents for refresh regardless of config")
+    schedule.add_argument("--skip-sp500", action="store_true", help="Exclude S&P 500 constituents even if enabled in config")
     schedule.add_argument("--limit", type=int, help="Override the maximum number of symbols refreshed per cycle")
     schedule.add_argument("--throttle", type=float, help="Override the Alpha Vantage throttle (seconds)")
     schedule.add_argument("--run-once", action="store_true", help="Run a single refresh cycle immediately and exit")

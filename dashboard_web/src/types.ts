@@ -137,6 +137,21 @@ export type StrategyMetricSummary = {
 
 export type MomentumTimeframe = "day" | "week" | "month" | "ytd";
 
+export type SectorStrategyScore = {
+  strategy: string;
+  average_score: number;
+  sample_size: number;
+};
+
+export type SectorScoreResponse = {
+  symbol: string;
+  sector?: string | null;
+  universe?: string | null;
+  timeframe: string;
+  sample_size: number;
+  strategy_scores: SectorStrategyScore[];
+};
+
 export type MomentumEntry = {
   symbol: string;
   name?: string | null;

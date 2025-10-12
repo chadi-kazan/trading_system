@@ -192,13 +192,11 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
           <span className="font-semibold text-slate-100">Current score:</span>{" "}
           {formatPercent(latestConfidencePercent)}
         </p>
-        {sectorAveragePercent !== null ? (
-          <p>
-            <span className="font-semibold text-slate-100">Sector average:</span>{" "}
-            {formatPercent(sectorAveragePercent)}
-            {hasSectorSample ? ` (${sectorSampleLabel})` : ""}
-          </p>
-        ) : null}
+        <p>
+          <span className="font-semibold text-slate-100">Sector average:</span>{" "}
+          {sectorAveragePercent !== null ? formatPercent(sectorAveragePercent) : "--"}
+          {hasSectorSample ? ` (${sectorSampleLabel})` : ""}
+        </p>
         {strategy.investment_bounds ? (
           <p>
             <span className="font-semibold text-slate-100">Optimal range:</span> {strategy.investment_bounds}
@@ -250,9 +248,8 @@ export function StrategyCard({ strategy, sectorScore }: StrategyCardProps) {
               <span className="text-sm font-medium text-slate-700">{sectorSampleLabel}</span>
               {sectorPerformanceDelta !== null ? (
                 <span
-                  className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${
-                    sectorPerformanceDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
-                  }`}
+                  className={`mt-1 inline-flex items-center rounded-full px-2 py-0.5 text-[11px] font-semibold ${sectorPerformanceDelta >= 0 ? "bg-emerald-50 text-emerald-600" : "bg-rose-50 text-rose-600"
+                    }`}
                 >
                   {sectorPerformanceDelta >= 0 ? "+" : ""}
                   {sectorPerformanceDelta.toFixed(1)} pts vs sector

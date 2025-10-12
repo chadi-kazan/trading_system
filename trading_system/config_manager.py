@@ -94,6 +94,7 @@ class FundamentalsRefreshAutomationConfig:
     time: str
     day: Optional[str] = None
     include_russell: bool = False
+    include_sp500: bool = False
     limit: Optional[int] = None
     throttle: float = 12.0
     validation: FundamentalsValidationConfig = field(default_factory=FundamentalsValidationConfig)

@@ -71,6 +71,7 @@
       "frequency": "daily",
       "time": "22:30",
       "include_russell": true,
+      "include_sp500": true,
       "limit": 200,
       "throttle": 12.0,
       "validation": {

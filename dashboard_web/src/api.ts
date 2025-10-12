@@ -115,4 +115,12 @@ export async function fetchSpMomentum(
   const response = await fetch(`${apiBase}/api/sp500/momentum?${params.toString()}`);
   return handleResponse<MomentumResponse>(response);
 }
+export async function fetchSectorScores(symbol: string, timeframe: MomentumTimeframe = "week"): Promise<SectorScoreResponse> {
+  const params = new URLSearchParams({
+    symbol,
+    timeframe,
+  });
+  const response = await fetch(`${apiBase}/api/momentum/sector-scores?${params.toString()}`);
+  return handleResponse<SectorScoreResponse>(response);
+}
 
