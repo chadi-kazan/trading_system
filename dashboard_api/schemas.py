@@ -123,6 +123,21 @@ class MomentumResponse(BaseModel):
     top_losers: List[MomentumEntry] = Field(default_factory=list)
 
 
+class SectorStrategyScore(BaseModel):
+    strategy: str
+    average_score: float
+    sample_size: int
+
+
+class SectorScoreResponse(BaseModel):
+    symbol: str
+    sector: Optional[str] = None
+    universe: Optional[str] = None
+    timeframe: str
+    sample_size: int
+    strategy_scores: List[SectorStrategyScore] = Field(default_factory=list)
+
+
 __all__ = [
     "AggregatedSignalPayload",
     "HealthResponse",
@@ -133,6 +148,9 @@ __all__ = [
     "StrategySignalPayload",
     "MomentumEntry",
     "MomentumResponse",
+    "SectorScoreResponse",
+    "SectorStrategyScore",
     "SymbolAnalysisResponse",
     "SymbolSearchResult",
 ]
+
