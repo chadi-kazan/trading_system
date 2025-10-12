@@ -18,6 +18,7 @@ import { SPMomentumPage } from "./pages/SPMomentumPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
+import { InfoIcon, Tooltip } from "./components/Tooltip";
 
 const THREE_YEARS_AGO = new Date();
 THREE_YEARS_AGO.setDate(THREE_YEARS_AGO.getDate() - 365 * 3);
@@ -45,6 +46,179 @@ function formatMultiplierValue(value: number | null | undefined): string {
     return "×1.00";
   }
   return `×${value.toFixed(2)}`;
+}
+
+type MetricDescriptor = {
+  label: string;
+  ideal: string;
+  compare: (value: number) => string;
+  format?: (value: number) => string;
+  chipClass?: string;
+  chipLabel?: string;
+};
+
+const macroFactorDescriptors: Record<string, MetricDescriptor> = {
+  vix: {
+    label: "VIX level",
+    ideal: "Below 20 (calm volatility)",
+    format: (value) => value.toFixed(2),
+    compare: (value) => {
+      if (value < 18) return "Comfortably calm – supportive for risk-on.";
+      if (value < 25) return "Volatility is elevated but manageable.";
+      return "Volatility stress – tighten exposure.";
+    },
+  },
+  vix_score: {
+    label: "VIX score",
+    ideal: "Above 0.60",
+    format: (value) => formatPercentValue(value, 0),
+    compare: (value) => {
+      if (value >= 0.7) return "Volatility backdrop favours risk-taking.";
+      if (value >= 0.5) return "Neutral volatility conditions.";
+      return "Volatility score warns of caution.";
+    },
+  },
+  credit_ratio: {
+    label: "HYG/LQD ratio",
+    ideal: "Above 0.97",
+    format: (value) => value.toFixed(3),
+    compare: (value) => {
+      if (value >= 0.98) return "Credit markets are signalling confidence.";
+      if (value >= 0.95) return "Credit tone is neutral.";
+      return "Credit markets are defensive – monitor spreads.";
+    },
+  },
+  credit_score: {
+    label: "Credit score",
+    ideal: "Above 0.60",
+    format: (value) => formatPercentValue(value, 0),
+    compare: (value) => {
+      if (value >= 0.7) return "Supportive credit momentum.";
+      if (value >= 0.5) return "Mixed credit signals.";
+      return "Credit stress is building – reduce risk.";
+    },
+  },
+  spy_20d_return: {
+    label: "SPY 20D return",
+    ideal: "Positive momentum (> 0%)",
+    format: (value) => formatPercentValue(value, 1),
+    compare: (value) => {
+      if (value >= 0.05) return "Strong equity momentum tailwind.";
+      if (value >= 0) return "Trend is modestly positive.";
+      return "Equity trend is negative – headwinds increasing.";
+    },
+  },
+  trend_score: {
+    label: "Trend score",
+    ideal: "Above 0.55",
+    format: (value) => formatPercentValue(value, 0),
+    compare: (value) => {
+      if (value >= 0.65) return "Trend regime is firmly risk-on.";
+      if (value >= 0.5) return "Trend regime is balanced.";
+      return "Trend regime is defensive.";
+    },
+  },
+};
+
+const defaultMacroDescriptor: MetricDescriptor = {
+  label: "Metric",
+  ideal: "Monitor for context",
+  format: (value) => Number(value).toFixed(3),
+  compare: () => "No benchmark available.",
+};
+
+const earningsMetricDescriptors: Record<string, MetricDescriptor> = {
+  score: {
+    label: "Composite score",
+    ideal: "≥ 0.70",
+    format: (value) => formatPercentValue(value, 0),
+    compare: (value) => {
+      if (value >= 0.7) return "Earnings momentum is strong.";
+      if (value >= 0.5) return "Earnings momentum is mixed.";
+      return "Earnings momentum is weak.";
+    },
+    chipClass: "rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700",
+    chipLabel: "Score",
+  },
+  multiplier: {
+    label: "Confidence multiplier",
+    ideal: "≥ ×0.90",
+    format: (value) => formatMultiplierValue(value),
+    compare: (value) => {
+      if (value >= 0.9) return "Earnings outlook is boosting signals.";
+      if (value >= 0.8) return "Earnings outlook is neutral.";
+      return "Earnings outlook is diluting conviction.";
+    },
+    chipClass: "rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700",
+    chipLabel: "Multiplier",
+  },
+  positive_ratio: {
+    label: "Beat ratio",
+    ideal: "≥ 60% of reports beating estimates",
+    format: (value) => formatPercentValue(value, 0),
+    compare: (value) => {
+      if (value >= 0.65) return "Companies are consistently beating estimates.";
+      if (value >= 0.5) return "Beat rate is acceptable but mixed.";
+      return "Beat rate is soft – conviction is lower.";
+    },
+    chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
+    chipLabel: "Beats",
+  },
+  surprise_average: {
+    label: "Average surprise",
+    ideal: "≥ +5%",
+    format: (value) => formatPercentValue(value, 1),
+    compare: (value) => {
+      if (value >= 0.05) return "Strong upside surprises supporting momentum.";
+      if (value >= 0) return "Surprise trend is steady.";
+      return "Negative surprises dragging on momentum.";
+    },
+    chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
+    chipLabel: "Avg surprise",
+  },
+  eps_trend: {
+    label: "EPS trend",
+    ideal: "Positive quarter-over-quarter",
+    format: (value) => formatPercentValue(value, 1),
+    compare: (value) => {
+      if (value >= 0.05) return "EPS growth is accelerating.";
+      if (value >= 0) return "EPS trend is stable.";
+      return "EPS trend is declining – monitor fundamentals.";
+    },
+    chipClass: "rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600",
+    chipLabel: "EPS trend",
+  },
+};
+
+const defaultEarningsDescriptor: MetricDescriptor = {
+  label: "Metric",
+  ideal: "Refer to context",
+  format: (value) => Number(value).toFixed(3),
+  compare: () => "No benchmark available.",
+  chipClass: "rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700",
+  chipLabel: "Metric",
+};
+
+function getMacroDescriptor(key: string): MetricDescriptor {
+  const descriptor = macroFactorDescriptors[key];
+  if (descriptor) {
+    return descriptor;
+  }
+  return {
+    ...defaultMacroDescriptor,
+    label: key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+  };
+}
+
+function getEarningsDescriptor(key: string): MetricDescriptor {
+  const descriptor = earningsMetricDescriptors[key];
+  if (descriptor) {
+    return descriptor;
+  }
+  return {
+    ...defaultEarningsDescriptor,
+    label: key.replace(/_/g, " ").replace(/\b\w/g, (char) => char.toUpperCase()),
+  };
 }
 
 function extractAnnotations(strategies: SymbolAnalysis["strategies"] | undefined) {
@@ -116,6 +290,19 @@ function DashboardPage({
   const macroOverlay = analysis?.macro_overlay ?? null;
   const macroFactorEntries = macroOverlay ? Object.entries(macroOverlay.factors ?? {}) : [];
   const earningsQuality = analysis?.earnings_quality ?? null;
+  const earningsMetricEntries = useMemo(
+    () =>
+      earningsQuality
+        ? [
+          { key: "score", value: earningsQuality.score ?? null },
+          { key: "multiplier", value: earningsQuality.multiplier ?? null },
+          { key: "positive_ratio", value: earningsQuality.positive_ratio ?? null },
+          { key: "surprise_average", value: earningsQuality.surprise_average ?? null },
+          { key: "eps_trend", value: earningsQuality.eps_trend ?? null },
+        ]
+        : [],
+    [earningsQuality],
+  );
   const finalScores: StrategyScore[] = useMemo(() => {
     if (!strategyCards.length) return [];
     return strategyCards.map((strategy) => {
@@ -444,8 +631,8 @@ function DashboardPage({
                     {sectorContext.universe === "russell"
                       ? "Small-cap (Russell 2000)"
                       : sectorContext.universe === "sp500"
-                      ? "Large-cap (S&P 500)"
-                      : "Tracked universe"}{" "}
+                        ? "Large-cap (S&P 500)"
+                        : "Tracked universe"}{" "}
                     ({sectorContext.sampleSize} symbols)
                   </p>
                 ) : (
@@ -519,13 +706,43 @@ function DashboardPage({
                       <span className="ml-2 text-slate-500">{formatMultiplierValue(macroOverlay.multiplier)}</span>
                     </p>
                     {macroFactorEntries.length ? (
-                      <ul className="mt-2 grid grid-cols-2 gap-1 text-[11px] text-slate-500">
-                        {macroFactorEntries.map(([name, value]) => (
-                          <li key={name} className="flex justify-between gap-2">
-                            <span className="uppercase tracking-wide text-slate-400">{name.replace(/_/g, " ")}</span>
-                            <span>{Number.isFinite(value) ? Number(value).toFixed(3) : "—"}</span>
-                          </li>
-                        ))}
+                      <ul className="mt-2 grid grid-cols-2 gap-2 text-[11px] text-slate-500">
+                        {macroFactorEntries.map(([name, rawValue]) => {
+                          const descriptor = getMacroDescriptor(name);
+                          const numericValue = typeof rawValue === "number" && Number.isFinite(rawValue) ? rawValue : null;
+                          const displayValue =
+                            numericValue !== null
+                              ? descriptor.format
+                                ? descriptor.format(numericValue)
+                                : Number(numericValue).toFixed(3)
+                              : "—";
+                          const tooltipContent = (
+                            <div className="space-y-1 text-left">
+                              <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
+                              <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
+                              <p className="text-[11px] text-slate-300">
+                                {numericValue !== null ? descriptor.compare(numericValue) : "No recent data."}
+                              </p>
+                            </div>
+                          );
+                          return (
+                            <li key={name} className="flex items-center justify-between gap-2 rounded-lg bg-white/80 px-2 py-1">
+                              <div className="flex items-center gap-1 text-slate-500">
+                                <span className="uppercase tracking-wide">{descriptor.label}</span>
+                                <Tooltip content={tooltipContent}>
+                                  <button
+                                    type="button"
+                                    className="inline-flex h-4 w-4 items-center justify-center rounded-full border border-slate-200 bg-white text-slate-400 transition hover:text-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-400/40"
+                                    aria-label={`Learn more about ${descriptor.label}`}
+                                  >
+                                    <InfoIcon />
+                                  </button>
+                                </Tooltip>
+                              </div>
+                              <span className="font-medium text-slate-700">{displayValue}</span>
+                            </li>
+                          );
+                        })}
                       </ul>
                     ) : null}
                   </div>
@@ -533,29 +750,41 @@ function DashboardPage({
                 {earningsQuality ? (
                   <div className="mt-3 text-xs text-slate-600">
                     <p className="font-semibold text-slate-700">Earnings quality</p>
-                    <div className="mt-1 flex flex-wrap gap-2">
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        Score {earningsQuality.score != null ? formatPercentValue(earningsQuality.score, 0) : "—"}
-                      </span>
-                      <span className="rounded-full bg-emerald-100 px-2 py-0.5 text-[11px] font-semibold text-emerald-700">
-                        {formatMultiplierValue(earningsQuality.multiplier ?? null)}
-                      </span>
-                      {earningsQuality.positive_ratio != null ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                          Beats {formatPercentValue(earningsQuality.positive_ratio, 0)}
-                        </span>
-                      ) : null}
-                      {earningsQuality.surprise_average != null ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                          Avg surprise {formatPercentValue(earningsQuality.surprise_average, 1)}
-                        </span>
-                      ) : null}
-                      {earningsQuality.eps_trend != null ? (
-                        <span className="rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-600">
-                          EPS trend {formatPercentValue(earningsQuality.eps_trend, 1)}
-                        </span>
-                      ) : null}
-                    </div>
+                    {earningsMetricEntries.length ? (
+                      <div className="mt-1 flex flex-wrap gap-2">
+                        {earningsMetricEntries.map(({ key, value }) => {
+                          const descriptor = getEarningsDescriptor(key);
+                          const numericValue = typeof value === "number" && Number.isFinite(value) ? value : null;
+                          const displayValue =
+                            numericValue !== null
+                              ? descriptor.format
+                                ? descriptor.format(numericValue)
+                                : Number(numericValue).toFixed(3)
+                              : "—";
+                          const chipLabel = descriptor.chipLabel ?? descriptor.label;
+                          const chipClass =
+                            descriptor.chipClass ??
+                            defaultEarningsDescriptor.chipClass ??
+                            "rounded-full bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700";
+                          const tooltipContent = (
+                            <div className="space-y-1 text-left">
+                              <p className="text-xs font-semibold text-slate-100">{descriptor.label}</p>
+                              <p className="text-[11px] text-slate-300">Ideal: {descriptor.ideal}</p>
+                              <p className="text-[11px] text-slate-300">
+                                {numericValue !== null ? descriptor.compare(numericValue) : "No recent data."}
+                              </p>
+                            </div>
+                          );
+                          return (
+                            <Tooltip key={key} content={tooltipContent}>
+                              <span className={chipClass}>
+                                {chipLabel} {displayValue}
+                              </span>
+                            </Tooltip>
+                          );
+                        })}
+                      </div>
+                    ) : null}
                   </div>
                 ) : null}
               </div>
@@ -701,8 +930,7 @@ function AppLayout({
                 to={link.to}
                 end={link.to === "/"}
                 className={({ isActive }) =>
-                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${
-                    isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
+                  `rounded-full px-4 py-2 transition focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-2 focus:ring-offset-slate-900 ${isActive ? "bg-white text-slate-900 shadow" : "bg-slate-800/60 text-slate-200 hover:bg-slate-700/80"
                   }`
                 }
               >
