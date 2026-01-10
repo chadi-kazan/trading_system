@@ -27,3 +27,9 @@ fastapi>=0.110.0
 uvicorn[standard]>=0.23.0
 pydantic>=2.6.0
 sqlmodel>=0.0.14
+
+# ASGI <-> WSGI adapter for hosting FastAPI on WSGI hosts (PythonAnywhere)
+asgiref>=3.8.0
+
+# Optional: Gunicorn for running with Uvicorn workers (alternative deployment)
+gunicorn>=21.0.0
