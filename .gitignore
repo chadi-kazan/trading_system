@@ -13,5 +13,6 @@ data/universe/fundamentals_cache/
 node_modules/
 dashboard_web/node_modules/
 dashboard_web/dist/
+dashboard_web/.env.local
 data/watchlist.db
 data/strategy_metrics.db
