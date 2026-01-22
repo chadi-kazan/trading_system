@@ -788,7 +788,7 @@ The system is intentionally modular - adjust a single component (e.g., filters, 
 
 
 
-\n## Cloud Deployment\n- [Cloud deployment plan](docs/cloud_deployment_plan.md): containerisation, hosting, and configuration guidance.\n
+\n## Cloud Deployment\n- [Cloud deployment plan](docs/cloud_deployment_plan.md): containerisation, hosting, and configuration guidance.\n- [CORS Configuration Guide](docs/CORS_CONFIGURATION.md): Configure Cross-Origin Resource Sharing for API access from frontend deployments.\n
 
 
 

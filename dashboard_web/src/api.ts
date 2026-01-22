@@ -11,6 +11,7 @@ import type {
   WatchlistStatus,
 } from "./types";
 
+// deployed on https://trading-system-jwophbwp8-chadis-projects-70db7a5c.vercel.app/
 const DEFAULT_API_BASE = "http://localhost:8000";
 const apiBase = import.meta.env.VITE_API_BASE_URL || DEFAULT_API_BASE;
 
