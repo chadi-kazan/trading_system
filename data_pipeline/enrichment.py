@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, Dict, Optional
 
+import numpy as np
 import pandas as pd
 
 
@@ -34,8 +35,8 @@ def enrich_price_frame(
     if "volume" in data.columns:
         avg_volume = data["volume"].rolling(volume_window, min_periods=1).mean()
         data["average_volume"] = avg_volume
-        with pd.option_context("mode.use_inf_as_na", True):
-            ratio = data["volume"] / avg_volume.replace(0, pd.NA) - 1
+        ratio = data["volume"] / avg_volume.replace(0, pd.NA) - 1
+        ratio = ratio.replace([np.inf, -np.inf], np.nan)
         data["volume_change"] = ratio.fillna(0)
 
     if "close" in data.columns:
