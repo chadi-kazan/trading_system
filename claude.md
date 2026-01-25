@@ -336,6 +336,14 @@ python main.py update-strategy-metrics --input data/strategy_metrics.json [--dry
 ```
 - Updates strategy weighting database
 
+#### 10. `precompute-momentum` - Warm Momentum Cache
+```bash
+python main.py precompute-momentum [--timeframes day week month ytd] [--limit 200] [--skip-russell] [--skip-sp500]
+```
+- Pre-computes momentum leaderboards for faster API responses
+- Uses batch price fetching and parallel processing
+- Run overnight to ensure warm caches during market hours
+
 ---
 
 ## API Endpoints
