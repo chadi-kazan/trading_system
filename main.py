@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import logging
 import shutil
+import time
 from dataclasses import asdict, dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
@@ -726,6 +727,73 @@ def handle_update_strategy_metrics(args: argparse.Namespace, ctx: AppContext) ->
     return 0
 
 
+def handle_precompute_momentum(args: argparse.Namespace, ctx: AppContext) -> int:
+    """Pre-compute momentum data for Russell 2000 and/or S&P 500 and cache it."""
+    import json
+    from datetime import datetime
+
+    from dashboard_api.services import RussellMomentumService, SPMomentumService
+
+    timeframes = args.timeframes or ["day", "week", "month", "ytd"]
+    cache_dir = ctx.config.storage.universe_dir / "momentum_cache"
+    cache_dir.mkdir(parents=True, exist_ok=True)
+
+    results = {}
+
+    if not args.skip_russell:
+        logger.info("Pre-computing Russell 2000 momentum data...")
+        try:
+            russell_service = RussellMomentumService(ctx.config)
+            for tf in timeframes:
+                logger.info("  Computing Russell momentum for timeframe: %s", tf)
+                start_time = time.time()
+                response = russell_service.get_momentum(timeframe=tf, limit=args.limit or 200)
+                elapsed = time.time() - start_time
+                logger.info("    Completed in %.2f seconds (%d symbols)", elapsed, response.evaluated_symbols)
+                results[f"russell_{tf}"] = {
+                    "timeframe": tf,
+                    "evaluated_symbols": response.evaluated_symbols,
+                    "skipped_symbols": response.skipped_symbols,
+                    "computed_at": datetime.utcnow().isoformat(),
+                }
+        except Exception as exc:
+            logger.error("Failed to compute Russell momentum: %s", exc)
+            if not args.skip_sp500:
+                logger.info("Continuing with S&P 500...")
+            else:
+                return 1
+
+    if not args.skip_sp500:
+        logger.info("Pre-computing S&P 500 momentum data...")
+        try:
+            sp_service = SPMomentumService(ctx.config)
+            for tf in timeframes:
+                logger.info("  Computing S&P 500 momentum for timeframe: %s", tf)
+                start_time = time.time()
+                response = sp_service.get_momentum(timeframe=tf, limit=args.limit or 200)
+                elapsed = time.time() - start_time
+                logger.info("    Completed in %.2f seconds (%d symbols)", elapsed, response.evaluated_symbols)
+                results[f"sp500_{tf}"] = {
+                    "timeframe": tf,
+                    "evaluated_symbols": response.evaluated_symbols,
+                    "skipped_symbols": response.skipped_symbols,
+                    "computed_at": datetime.utcnow().isoformat(),
+                }
+        except Exception as exc:
+            logger.error("Failed to compute S&P 500 momentum: %s", exc)
+            return 1
+
+    # Write summary to cache directory
+    summary_path = cache_dir / "precompute_summary.json"
+    summary = {
+        "last_run": datetime.utcnow().isoformat(),
+        "results": results,
+    }
+    summary_path.write_text(json.dumps(summary, indent=2))
+    logger.info("Pre-computation complete. Summary written to %s", summary_path)
+
+    return 0
+
 
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(description="Small-Cap Growth Trading System CLI")
@@ -820,6 +888,13 @@ def build_parser() -> argparse.ArgumentParser:
     schedule.add_argument("--max-iterations", type=int, help="Limit the number of scheduled cycles before exiting")
     schedule.add_argument("--force", action="store_true", help="Run even if automation is disabled in the configuration")
     schedule.set_defaults(handler=handle_schedule_fundamentals)
+
+    precompute = subparsers.add_parser("precompute-momentum", help="Pre-compute momentum data for faster API responses")
+    precompute.add_argument("--timeframes", nargs="+", choices=["day", "week", "month", "ytd"], help="Timeframes to compute (default: all)")
+    precompute.add_argument("--limit", type=int, default=200, help="Maximum symbols per leaderboard (default: 200)")
+    precompute.add_argument("--skip-russell", action="store_true", help="Skip Russell 2000 momentum computation")
+    precompute.add_argument("--skip-sp500", action="store_true", help="Skip S&P 500 momentum computation")
+    precompute.set_defaults(handler=handle_precompute_momentum)
 
     return parser
 

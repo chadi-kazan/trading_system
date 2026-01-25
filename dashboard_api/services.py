@@ -5,6 +5,7 @@ from __future__ import annotations
 import copy
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import TYPE_CHECKING, Any, Callable, Dict, Iterable, List, Optional, Sequence, Tuple
@@ -20,7 +21,7 @@ from analytics import (
 from data_pipeline import enrich_price_frame, load_fundamental_metrics
 from data_pipeline.alpha_vantage_client import AlphaVantageClient, AlphaVantageError
 from data_providers.base import PriceRequest
-from data_providers.yahoo import YahooPriceProvider
+from data_providers.yahoo import BatchPriceResult, YahooPriceProvider
 from indicators.moving_average import ema
 from indicators.volatility import average_true_range
 from strategies.aggregation import AggregationParams, SignalAggregator
@@ -762,19 +763,180 @@ class BaseMomentumService:
         end_date = date.today()
         start_date = self._compute_start_date(end_date, tf)
 
-        entries: List[MomentumEntry] = []
-        skipped = 0
-
-        for symbol in symbols:
-            entry = self._evaluate_symbol(symbol, start_date, end_date, tf)
-            if entry is None:
-                skipped += 1
-                continue
-            entries.append(entry)
+        # Use optimized batch fetching and parallel processing
+        entries, skipped = self._gather_entries_parallel(symbols, start_date, end_date, tf)
 
         cache_entries = [entry.model_copy(deep=True) for entry in entries]
         self._entries_cache[tf] = (now, cache_entries, len(symbols), skipped)
         return entries, len(symbols), skipped
+
+    def _gather_entries_parallel(
+        self,
+        symbols: List[str],
+        start_date: date,
+        end_date: date,
+        timeframe: str,
+        max_workers: int = 8,
+    ) -> Tuple[List[MomentumEntry], int]:
+        """Gather momentum entries using batch price fetching and parallel processing."""
+        entries: List[MomentumEntry] = []
+        skipped = 0
+
+        # Step 1: Batch fetch all price data at once
+        LOGGER.info("Batch fetching prices for %d symbols", len(symbols))
+        batch_result = self.price_provider.get_batch_price_history(
+            symbols=symbols,
+            start=start_date,
+            end=end_date,
+            interval="1d",
+        )
+        LOGGER.info(
+            "Batch fetch complete: %d from cache, %d fetched, %d failed",
+            batch_result.from_cache_count,
+            batch_result.fetched_count,
+            len(batch_result.failed),
+        )
+
+        # Track failed symbols
+        skipped += len(batch_result.failed)
+
+        # Pre-compute macro regime once (shared across all symbols)
+        macro_snapshot = self._regime_analyzer.current()
+
+        # Step 2: Process symbols in parallel using ThreadPoolExecutor
+        symbols_with_data = list(batch_result.results.keys())
+
+        def process_symbol(symbol: str) -> Optional[MomentumEntry]:
+            """Process a single symbol using pre-fetched price data."""
+            try:
+                price_result = batch_result.results.get(symbol)
+                if price_result is None or price_result.data.empty:
+                    return None
+                return self._evaluate_symbol_with_data(
+                    symbol, price_result.data, start_date, end_date, timeframe, macro_snapshot
+                )
+            except Exception as exc:
+                LOGGER.debug("Failed to process %s: %s", symbol, exc)
+                return None
+
+        with ThreadPoolExecutor(max_workers=max_workers) as executor:
+            future_to_symbol = {
+                executor.submit(process_symbol, symbol): symbol
+                for symbol in symbols_with_data
+            }
+
+            for future in as_completed(future_to_symbol):
+                symbol = future_to_symbol[future]
+                try:
+                    entry = future.result()
+                    if entry is not None:
+                        entries.append(entry)
+                    else:
+                        skipped += 1
+                except Exception as exc:
+                    LOGGER.debug("Exception processing %s: %s", symbol, exc)
+                    skipped += 1
+
+        return entries, skipped
+
+    def _evaluate_symbol_with_data(
+        self,
+        symbol: str,
+        frame: pd.DataFrame,
+        start_date: date,
+        end_date: date,
+        timeframe: str,
+        macro_snapshot: MarketRegimeSnapshot,
+    ) -> Optional[MomentumEntry]:
+        """Evaluate a symbol using pre-fetched price data and pre-computed macro snapshot."""
+        if frame.empty or "close" not in frame.columns:
+            return None
+
+        reference_price = self._select_reference_price(frame, timeframe)
+        if reference_price is None or reference_price <= 0:
+            return None
+
+        enriched, fundamentals = self._prepare_enriched_frame(symbol, frame)
+        strategy_scores, final_score, overlays = self._score_symbol_with_macro(
+            symbol, enriched, fundamentals, macro_snapshot
+        )
+
+        latest_row = frame.iloc[-1]
+        last_close = _safe_float(latest_row.get("close"))
+        change_absolute = last_close - reference_price
+        change_percent = (change_absolute / reference_price) * 100.0 if reference_price else 0.0
+
+        volume = latest_row.get("volume")
+        volume_value = _maybe_float(volume)
+        average_volume = None
+        relative_volume = None
+        if "volume" in frame.columns:
+            average_volume = _maybe_float(frame["volume"].tail(20).mean())
+            if average_volume and average_volume > 0 and volume_value is not None:
+                relative_volume = volume_value / average_volume
+
+        metadata = self._load_metadata().get(symbol, {})
+
+        return MomentumEntry(
+            symbol=symbol,
+            name=metadata.get("name") or symbol,
+            sector=metadata.get("sector"),
+            last_price=last_close,
+            change_absolute=change_absolute,
+            change_percent=change_percent,
+            reference_price=reference_price,
+            updated_at=_ensure_datetime(frame.index[-1]),
+            volume=volume_value,
+            average_volume=average_volume,
+            relative_volume=relative_volume,
+            data_points=len(frame.index),
+            strategy_scores=strategy_scores,
+            final_score=final_score,
+            overlays=overlays,
+        )
+
+    def _score_symbol_with_macro(
+        self,
+        symbol: str,
+        enriched: pd.DataFrame,
+        fundamentals: Dict[str, Any],
+        macro_snapshot: MarketRegimeSnapshot,
+    ) -> Tuple[Dict[str, float], Optional[float], Dict[str, Optional[float]]]:
+        """Score symbol using pre-computed macro snapshot to avoid redundant API calls."""
+        scores: Dict[str, float] = {}
+        collected: List[StrategySignal] = []
+
+        for name in STRATEGY_ORDER:
+            strategy = self._strategy_map.get(name)
+            if strategy is None:
+                continue
+            try:
+                signals = strategy.generate_signals(symbol, enriched)
+            except Exception as exc:
+                LOGGER.debug("Strategy %s failed for %s: %s", name, symbol, exc)
+                signals = []
+            if signals:
+                latest_signal = signals[-1]
+                scores[name] = float(latest_signal.confidence)
+                collected.extend(signals)
+            else:
+                scores[name] = 0.0
+
+        aggregated = list(self.aggregator.aggregate(collected))
+        earnings_signal = compute_earnings_signal(fundamentals)
+        overlays = {
+            "macro_multiplier": macro_snapshot.multiplier,
+            "earnings_multiplier": earnings_signal.multiplier(),
+            "macro_score": macro_snapshot.score,
+            "earnings_score": earnings_signal.score if earnings_signal.score is not None else None,
+        }
+
+        if not aggregated:
+            return scores, None, overlays
+
+        base_confidence = float(aggregated[-1].confidence)
+        final_score = base_confidence * overlays["macro_multiplier"] * overlays["earnings_multiplier"]
+        return scores, final_score, overlays
 
     # ------------------------------------------------------------------
     # Internal helpers

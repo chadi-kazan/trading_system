@@ -3,12 +3,16 @@ from __future__ import annotations
 import logging
 import os
 
+from dotenv import load_dotenv
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import api_router
 
-logging.basicConfig(level=logging.DEBUG)
+# Load environment variables from .env file (if it exists)
+load_dotenv()
+
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="Small-Cap Growth Dashboard API",

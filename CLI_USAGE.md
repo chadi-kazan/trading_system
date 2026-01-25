@@ -2,10 +2,10 @@
 
 Run the entry point with `python main.py <command>` using the options below. All commands share the global flags:
 
-- `--settings PATH` – override the user settings JSON (defaults to `config/settings.local.json`).
-- `--defaults PATH` – use an alternate defaults file instead of `config/default_settings.json`.
-- `--force-config-reload` – bypass the cached configuration and reload from disk.
-- `--verbose` – enable debug logging for additional diagnostics.
+- `--settings PATH` ï¿½ override the user settings JSON (defaults to `config/settings.local.json`).
+- `--defaults PATH` ï¿½ use an alternate defaults file instead of `config/default_settings.json`.
+- `--force-config-reload` ï¿½ bypass the cached configuration and reload from disk.
+- `--verbose` ï¿½ enable debug logging for additional diagnostics.
 
 ## Commands
 
@@ -103,3 +103,28 @@ python main.py schedule-fundamentals [--run-once] [--max-iterations N]
 - Use `--run-once` when an external scheduler (cron/Task Scheduler) invokes the command and you want it to exit after one cycle.
 - `--force` overrides a disabled automation toggle in config for ad-hoc runs.
 - `--max-iterations` limits the number of refresh cycles when running interactively.
+
+### precompute-momentum
+Pre-compute momentum leaderboards for Russell 2000 and S&P 500 to warm the API cache.
+
+```
+python main.py precompute-momentum [--timeframes day week month ytd]
+                                   [--limit N] [--skip-russell] [--skip-sp500]
+```
+
+- Fetches price data in batch and computes strategy scores for all symbols.
+- Results are cached in memory (5-minute TTL) for faster API responses.
+- Use `--timeframes` to compute specific periods (default: all four).
+- `--limit` controls the maximum symbols per leaderboard (default: 200).
+- `--skip-russell` or `--skip-sp500` to exclude an index from computation.
+- Run overnight via cron/Task Scheduler to ensure warm caches during market hours.
+
+**Example scheduled task (Windows):**
+```powershell
+schtasks /Create /SC DAILY /ST 06:00 /TN "PrecomputeMomentum" /TR "cmd /c cd C:\projects\trading_system && .venv\Scripts\python.exe main.py precompute-momentum"
+```
+
+**Example cron job (Linux/macOS):**
+```bash
+0 6 * * * cd /path/to/trading_system && source .venv/bin/activate && python main.py precompute-momentum
+```
