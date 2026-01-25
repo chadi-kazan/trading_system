@@ -37,7 +37,7 @@ def enrich_price_frame(
         data["average_volume"] = avg_volume
         ratio = data["volume"] / avg_volume.replace(0, pd.NA) - 1
         ratio = ratio.replace([np.inf, -np.inf], np.nan)
-        data["volume_change"] = ratio.fillna(0)
+        data["volume_change"] = ratio.fillna(0.0).astype(np.float64)
 
     if "close" in data.columns:
         rolling_high = data["close"].rolling(strength_window, min_periods=1).max()
@@ -45,9 +45,9 @@ def enrich_price_frame(
         data["fifty_two_week_high"] = rolling_high
         price_range = (rolling_high - rolling_low).replace(0, pd.NA)
         relative_strength = (data["close"] - rolling_low) / price_range
-        data["relative_strength"] = relative_strength.clip(lower=0, upper=1).fillna(0)
+        data["relative_strength"] = relative_strength.clip(lower=0, upper=1).fillna(0.0).astype(np.float64)
         earnings_proxy = data["close"].pct_change(strength_window)
-        data["earnings_growth"] = earnings_proxy.fillna(0)
+        data["earnings_growth"] = earnings_proxy.fillna(0.0).astype(np.float64)
 
     if fundamentals:
         overrides_applied = False
