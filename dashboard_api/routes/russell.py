@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import Literal
 
 from fastapi import APIRouter, Depends, HTTPException, Query, status
@@ -9,6 +10,8 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from ..dependencies import get_russell_momentum_service
 from ..schemas import MomentumResponse
 from ..services import RussellMomentumService
+
+LOGGER = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/russell", tags=["Russell"])
 
@@ -36,12 +39,18 @@ def get_russell_momentum(
 ) -> MomentumResponse:
     """Return Russell 2000 momentum data for dashboards."""
     try:
-        return service.get_momentum(timeframe=timeframe, limit=limit)
+        print(f">>> get_russell_momentum called: timeframe={timeframe}, limit={limit}")
+        result = service.get_momentum(timeframe=timeframe, limit=limit)
+        print(">>> get_russell_momentum completed successfully")
+        return result
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail=str(exc)) from exc
     except RuntimeError as exc:
         raise HTTPException(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, detail=str(exc)) from exc
     except Exception as exc:  # pragma: no cover - defensive
+        import traceback
+        print(f">>> UNEXPECTED ERROR in get_russell_momentum: {exc}")
+        traceback.print_exc()
         raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail="Unexpected error") from exc
 
 

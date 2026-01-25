@@ -2,9 +2,12 @@
 
 from __future__ import annotations
 
+import logging
 from functools import lru_cache
 
 from .services import MomentumAnalyticsService, RussellMomentumService, SPMomentumService, SignalService
+
+LOGGER = logging.getLogger(__name__)
 
 
 @lru_cache(maxsize=1)
@@ -14,7 +17,16 @@ def get_signal_service() -> SignalService:
 
 @lru_cache(maxsize=1)
 def get_russell_momentum_service() -> RussellMomentumService:
-    return RussellMomentumService()
+    try:
+        print(">>> Creating RussellMomentumService...")
+        service = RussellMomentumService()
+        print(">>> RussellMomentumService created successfully")
+        return service
+    except Exception as exc:
+        import traceback
+        print(f">>> FAILED to create RussellMomentumService: {exc}")
+        traceback.print_exc()
+        raise
 
 
 @lru_cache(maxsize=1)
