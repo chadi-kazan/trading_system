@@ -4,8 +4,11 @@ from __future__ import annotations
 
 import logging
 import time
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from dataclasses import dataclass
 from datetime import date, datetime, timedelta
 from pathlib import Path
+from typing import Dict, List, Optional, Sequence
 
 import pandas as pd
 import yfinance as yf
@@ -13,6 +16,16 @@ import yfinance as yf
 from .base import PriceRequest, PriceResult
 
 LOGGER = logging.getLogger(__name__)
+
+
+@dataclass
+class BatchPriceResult:
+    """Result of a batch price fetch operation."""
+
+    results: Dict[str, PriceResult]
+    failed: List[str]
+    from_cache_count: int
+    fetched_count: int
 
 
 class YahooPriceProvider:
@@ -53,6 +66,156 @@ class YahooPriceProvider:
 
         filtered = self._filter_frame(standardised, request.start, request.end)
         return PriceResult(data=filtered, from_cache=False, cache_path=cache_path)
+
+    def get_batch_price_history(
+        self,
+        symbols: Sequence[str],
+        start: date,
+        end: date,
+        interval: str = "1d",
+    ) -> BatchPriceResult:
+        """Fetch price history for multiple symbols efficiently using batch download.
+
+        Symbols with valid cache are served from cache; remaining symbols are
+        fetched in a single batch request to Yahoo Finance.
+        """
+        results: Dict[str, PriceResult] = {}
+        failed: List[str] = []
+        from_cache_count = 0
+        symbols_to_fetch: List[str] = []
+
+        # Check cache first for each symbol
+        for symbol in symbols:
+            symbol_upper = symbol.strip().upper()
+            if not symbol_upper:
+                continue
+            cache_path = self._cache_path(symbol_upper, interval)
+            request = PriceRequest(symbol=symbol_upper, start=start, end=end, interval=interval)
+            if self._cache_satisfies(request, cache_path):
+                try:
+                    data = self._load_cache(cache_path)
+                    filtered = self._filter_frame(data, start, end)
+                    results[symbol_upper] = PriceResult(data=filtered, from_cache=True, cache_path=cache_path)
+                    from_cache_count += 1
+                except Exception as exc:
+                    LOGGER.debug("Cache load failed for %s: %s", symbol_upper, exc)
+                    symbols_to_fetch.append(symbol_upper)
+            else:
+                symbols_to_fetch.append(symbol_upper)
+
+        # Batch download remaining symbols
+        if symbols_to_fetch:
+            batch_results, batch_failed = self._batch_download(symbols_to_fetch, start, end, interval)
+            results.update(batch_results)
+            failed.extend(batch_failed)
+
+        return BatchPriceResult(
+            results=results,
+            failed=failed,
+            from_cache_count=from_cache_count,
+            fetched_count=len(results) - from_cache_count,
+        )
+
+    def _batch_download(
+        self,
+        symbols: List[str],
+        start: date,
+        end: date,
+        interval: str,
+    ) -> tuple[Dict[str, PriceResult], List[str]]:
+        """Download multiple symbols in a single yfinance batch request."""
+        results: Dict[str, PriceResult] = {}
+        failed: List[str] = []
+
+        if not symbols:
+            return results, failed
+
+        LOGGER.info("Batch downloading %d symbols from Yahoo Finance", len(symbols))
+        end_inclusive = end + timedelta(days=1)
+
+        try:
+            # yf.download with multiple symbols returns a DataFrame with MultiIndex columns
+            data = yf.download(
+                symbols,
+                start=start.isoformat(),
+                end=end_inclusive.isoformat(),
+                interval=interval,
+                progress=False,
+                auto_adjust=False,
+                threads=True,  # Enable threading for batch downloads
+                group_by="ticker",
+            )
+
+            if data.empty:
+                LOGGER.warning("Batch download returned empty data for all symbols")
+                failed.extend(symbols)
+                return results, failed
+
+            # Process each symbol from the batch result
+            for symbol in symbols:
+                try:
+                    if isinstance(data.columns, pd.MultiIndex):
+                        # Multi-symbol download: columns are (ticker, field)
+                        if symbol in data.columns.get_level_values(0):
+                            symbol_data = data[symbol].copy()
+                        else:
+                            LOGGER.debug("Symbol %s not found in batch result", symbol)
+                            failed.append(symbol)
+                            continue
+                    else:
+                        # Single symbol fallback
+                        symbol_data = data.copy()
+
+                    if symbol_data.empty or symbol_data.dropna(how="all").empty:
+                        LOGGER.debug("Empty data for %s in batch result", symbol)
+                        failed.append(symbol)
+                        continue
+
+                    # Drop rows where all values are NaN
+                    symbol_data = symbol_data.dropna(how="all")
+
+                    standardised = self._prepare_frame_from_batch(symbol_data, symbol)
+                    cache_path = self._cache_path(symbol, interval)
+                    standardised.to_csv(cache_path, index=True, index_label="date")
+
+                    filtered = self._filter_frame(standardised, start, end)
+                    results[symbol] = PriceResult(data=filtered, from_cache=False, cache_path=cache_path)
+
+                except Exception as exc:
+                    LOGGER.debug("Failed to process %s from batch: %s", symbol, exc)
+                    failed.append(symbol)
+
+        except Exception as exc:
+            LOGGER.warning("Batch download failed: %s", exc)
+            failed.extend(symbols)
+
+        return results, failed
+
+    @staticmethod
+    def _prepare_frame_from_batch(raw: pd.DataFrame, symbol: str) -> pd.DataFrame:
+        """Prepare a single symbol's data extracted from a batch download."""
+        frame = raw.copy()
+
+        # Normalise column names to lowercase snake_case
+        normalised_columns = []
+        for col in frame.columns:
+            col_str = str(col).lower().replace(" ", "_")
+            normalised_columns.append(col_str)
+        frame.columns = normalised_columns
+
+        if "adj_close" not in frame.columns and "adjclose" in frame.columns:
+            frame = frame.rename(columns={"adjclose": "adj_close"})
+
+        required = {"open", "high", "low", "close", "volume"}
+        if not required.issubset(frame.columns):
+            raise RuntimeError(f"Downloaded data for {symbol} missing required OHLCV columns")
+
+        if "adj_close" not in frame.columns:
+            frame["adj_close"] = frame["close"]
+
+        ordered = frame[["open", "high", "low", "close", "adj_close", "volume"]].copy()
+        ordered.index.name = "date"
+        return ordered.sort_index()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -170,4 +333,4 @@ class YahooPriceProvider:
         return ordered.sort_index()
 
 
-__all__ = ["YahooPriceProvider"]
+__all__ = ["YahooPriceProvider", "BatchPriceResult"]

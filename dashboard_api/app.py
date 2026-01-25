@@ -8,7 +8,7 @@ from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import api_router
 
-logging.basicConfig(level=logging.DEBUG)
+logging.basicConfig(level=logging.INFO)
 
 app = FastAPI(
     title="Small-Cap Growth Dashboard API",
