@@ -1,11 +1,14 @@
 from __future__ import annotations
 
+import logging
 import os
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from .routes import api_router
+
+logging.basicConfig(level=logging.DEBUG)
 
 app = FastAPI(
     title="Small-Cap Growth Dashboard API",
