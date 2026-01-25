@@ -8,15 +8,42 @@ The Admin API provides HTTP endpoints to trigger data refresh operations that wo
 
 **Base Path:** `/api/admin`
 
-## Security Considerations
+## Authentication
 
-⚠️ **Important:** These endpoints trigger long-running operations and should be protected in production.
+✅ **All admin endpoints require API key authentication.**
 
-**Recommendations:**
-1. Add authentication middleware (API key, OAuth, etc.)
-2. Use environment variables to enable/disable admin endpoints
-3. Rate limit these endpoints to prevent abuse
-4. Monitor execution time and resource usage
+### Setup
+
+1. Generate a secure API key:
+   ```bash
+   python -c "from dashboard_api.auth import generate_api_key; print(generate_api_key())"
+   ```
+
+2. Set the environment variable:
+   ```bash
+   export ADMIN_API_KEY="your-generated-key-here"
+   ```
+
+3. Include the key in all requests:
+   ```bash
+   curl -X POST https://your-api.onrender.com/api/admin/refresh-russell \
+     -H "X-Admin-API-Key: your-generated-key-here"
+   ```
+
+### Response Codes
+
+| Code | Meaning |
+|------|---------|
+| 401 | Missing `X-Admin-API-Key` header |
+| 403 | Invalid API key |
+| 503 | `ADMIN_API_KEY` environment variable not configured on server |
+
+### Security Best Practices
+
+1. Use a strong, randomly generated key (32+ characters)
+2. Rotate keys periodically
+3. Never commit keys to version control
+4. Use different keys for staging and production
 
 ## Endpoints
 
@@ -48,7 +75,8 @@ GET /api/admin/refresh-status
 
 **cURL Example:**
 ```bash
-curl https://your-api.onrender.com/api/admin/refresh-status
+curl https://your-api.onrender.com/api/admin/refresh-status \
+  -H "X-Admin-API-Key: your-api-key"
 ```
 
 ---
@@ -73,7 +101,8 @@ POST /api/admin/refresh-russell
 
 **cURL Example:**
 ```bash
-curl -X POST https://your-api.onrender.com/api/admin/refresh-russell
+curl -X POST https://your-api.onrender.com/api/admin/refresh-russell \
+  -H "X-Admin-API-Key: your-api-key"
 ```
 
 **Execution Time:** ~10-30 seconds
@@ -120,13 +149,16 @@ POST /api/admin/refresh-fundamentals?include_russell=true&include_sp500=true&lim
 
 ```bash
 # Default: Include both Russell and S&P 500, limit 200
-curl -X POST https://your-api.onrender.com/api/admin/refresh-fundamentals
+curl -X POST https://your-api.onrender.com/api/admin/refresh-fundamentals \
+  -H "X-Admin-API-Key: your-api-key"
 
 # Russell only, limit 100
-curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?include_russell=true&include_sp500=false&limit=100"
+curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?include_russell=true&include_sp500=false&limit=100" \
+  -H "X-Admin-API-Key: your-api-key"
 
 # S&P 500 only, limit 50
-curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?include_russell=false&include_sp500=true&limit=50"
+curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?include_russell=false&include_sp500=true&limit=50" \
+  -H "X-Admin-API-Key: your-api-key"
 ```
 
 **Execution Time:**
@@ -181,7 +213,8 @@ POST /api/admin/refresh-all
 
 **cURL Example:**
 ```bash
-curl -X POST https://your-api.onrender.com/api/admin/refresh-all
+curl -X POST https://your-api.onrender.com/api/admin/refresh-all \
+  -H "X-Admin-API-Key: your-api-key"
 ```
 
 **Execution Time:** ~40-60 minutes (dominated by fundamentals refresh)
@@ -237,10 +270,10 @@ Use a cron job or external scheduler to hit the refresh endpoints:
 **Using cURL (Linux/macOS cron):**
 ```bash
 # Every day at 2 AM, refresh Russell
-0 2 * * * curl -X POST https://your-api.onrender.com/api/admin/refresh-russell
+0 2 * * * curl -X POST https://your-api.onrender.com/api/admin/refresh-russell -H "X-Admin-API-Key: $ADMIN_API_KEY"
 
 # Every Sunday at 3 AM, refresh fundamentals (50 at a time)
-0 3 * * 0 curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?limit=50"
+0 3 * * 0 curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?limit=50" -H "X-Admin-API-Key: $ADMIN_API_KEY"
 ```
 
 **Using GitHub Actions:**
@@ -260,12 +293,16 @@ jobs:
     steps:
       - name: Refresh Russell 2000
         run: |
-          curl -X POST https://your-api.onrender.com/api/admin/refresh-russell
+          curl -X POST https://your-api.onrender.com/api/admin/refresh-russell \
+            -H "X-Admin-API-Key: ${{ secrets.ADMIN_API_KEY }}"
 
       - name: Refresh Fundamentals (Small Batch)
         run: |
-          curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?limit=50"
+          curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?limit=50" \
+            -H "X-Admin-API-Key: ${{ secrets.ADMIN_API_KEY }}"
 ```
+
+**Note:** Add `ADMIN_API_KEY` to your GitHub repository secrets.
 
 ---
 
@@ -303,54 +340,6 @@ curl -X POST "https://your-api.onrender.com/api/admin/refresh-fundamentals?limit
 ```
 
 ---
-
-## Production Security
-
-### Option 1: API Key Authentication
-
-Add a simple API key check:
-
-```python
-# In dashboard_api/routes/admin.py
-from fastapi import Header, HTTPException
-
-ADMIN_API_KEY = os.getenv("ADMIN_API_KEY", "")
-
-async def verify_api_key(x_api_key: str = Header(...)):
-    if not ADMIN_API_KEY or x_api_key != ADMIN_API_KEY:
-        raise HTTPException(status_code=403, detail="Invalid API key")
-
-# Then add dependency to each endpoint:
-@router.post("/refresh-russell", dependencies=[Depends(verify_api_key)])
-async def refresh_russell() -> dict[str, str]:
-    # ...
-```
-
-**Usage:**
-```bash
-curl -X POST https://your-api.onrender.com/api/admin/refresh-russell \
-  -H "X-API-Key: your-secret-key"
-```
-
-Set `ADMIN_API_KEY` environment variable on Render.com.
-
----
-
-### Option 2: Disable in Production
-
-Use an environment variable to disable admin endpoints:
-
-```python
-# In dashboard_api/routes/__init__.py
-import os
-
-# Only include admin router if explicitly enabled
-if os.getenv("ENABLE_ADMIN_API", "false").lower() == "true":
-    from . import admin
-    api_router.include_router(admin.router)
-```
-
-Set `ENABLE_ADMIN_API=true` on Render.com only when needed.
 
 ---
 
