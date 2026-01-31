@@ -1,8 +1,9 @@
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
 
+from ..auth import require_app_access_key
 from . import admin, meta, momentum, russell, sp500, strategy_metrics, symbols, watchlist
 
-api_router = APIRouter(prefix="/api")
+api_router = APIRouter(prefix="/api", dependencies=[Depends(require_app_access_key)])
 api_router.include_router(meta.router)
 api_router.include_router(symbols.router)
 api_router.include_router(watchlist.router)

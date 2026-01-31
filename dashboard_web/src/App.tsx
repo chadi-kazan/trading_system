@@ -35,10 +35,13 @@ import { GlossaryPage } from "./pages/GlossaryPage";
 import { StrategyWeightsPage } from "./pages/StrategyWeightsPage";
 import { RussellMomentumPage } from "./pages/RussellMomentumPage";
 import { SPMomentumPage } from "./pages/SPMomentumPage";
+import { AdminPage } from "./pages/AdminPage";
 import { useWatchlist, WATCHLIST_STATUSES } from "./hooks/useWatchlist";
 import type { SavedSignal, WatchlistStatus } from "./hooks/useWatchlist";
 import { useStrategyMetrics } from "./hooks/useStrategyMetrics";
 import { Tooltip, InfoIcon } from "./components/Tooltip";
+import { AuthProvider, useAuth } from "./hooks/useAuth";
+import { LoginPage } from "./pages/LoginPage";
 
 const THREE_YEARS_AGO = new Date();
 THREE_YEARS_AGO.setDate(THREE_YEARS_AGO.getDate() - 365 * 3);
@@ -932,6 +935,7 @@ const navLinks = [
   { label: "Signal Guides", to: "/guides/signals" },
   { label: "Glossary", to: "/guides/glossary" },
   { label: "Strategy Health", to: "/diagnostics/strategy-weights" },
+  { label: "Admin", to: "/admin" },
 ];
 
 type AppLayoutProps = {
@@ -1014,6 +1018,7 @@ function AppLayout({
         <Route path="/guides/signals" element={<SignalGuide />} />
         <Route path="/guides/glossary" element={<GlossaryPage />} />
         <Route path="/diagnostics/strategy-weights" element={<StrategyWeightsPage />} />
+        <Route path="/admin" element={<AdminPage />} />
         <Route path="*" element={<NotFoundPage />} />
       </Routes>
     </div>
@@ -1037,7 +1042,8 @@ function NotFoundPage() {
   );
 }
 
-export default function App() {
+function AppContent() {
+  const { isAuthenticated } = useAuth();
   const [strategies, setStrategies] = useState<StrategyInfo[]>([]);
   const { items: watchlistItems, save: persistWatchlist, remove } = useWatchlist();
   const { metrics: strategyMetrics } = useStrategyMetrics(false);
@@ -1061,8 +1067,10 @@ export default function App() {
   }, [strategyMetrics]);
 
   useEffect(() => {
-    fetchStrategies().then(setStrategies).catch((err) => console.error(err));
-  }, []);
+    if (isAuthenticated) {
+      fetchStrategies().then(setStrategies).catch((err) => console.error(err));
+    }
+  }, [isAuthenticated]);
 
   const handleSaveWatchlist = ({ symbol, status, finalScores, averageScore, aggregatedSignal }: SavePayload) => {
     void persistWatchlist({
@@ -1083,16 +1091,28 @@ export default function App() {
       aggregated_signal: null,
     });
 
+  if (!isAuthenticated) {
+    return <LoginPage />;
+  }
+
   return (
-    <BrowserRouter>
-      <AppLayout
-        strategies={strategies}
-        watchlistItems={watchlistItems}
-        handleSaveWatchlist={handleSaveWatchlist}
-        handleQuickWatchlist={handleQuickWatchlist}
-        removeFromWatchlist={remove}
-        strategyWeights={strategyWeights}
-      />
-    </BrowserRouter>
+    <AppLayout
+      strategies={strategies}
+      watchlistItems={watchlistItems}
+      handleSaveWatchlist={handleSaveWatchlist}
+      handleQuickWatchlist={handleQuickWatchlist}
+      removeFromWatchlist={remove}
+      strategyWeights={strategyWeights}
+    />
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <BrowserRouter>
+        <AppContent />
+      </BrowserRouter>
+    </AuthProvider>
   );
 }
