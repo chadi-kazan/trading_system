@@ -36,6 +36,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setIsAuthenticated(false);
   };
 
+  useEffect(() => {
+    // Listen for authentication errors from API calls
+    const handleAuthError = () => {
+      setAccessKey(null);
+      setIsAuthenticated(false);
+    };
+
+    window.addEventListener('auth-error', handleAuthError);
+    return () => window.removeEventListener('auth-error', handleAuthError);
+  }, []);
+
   return (
     <AuthContext.Provider value={{ isAuthenticated, accessKey, login, logout }}>
       {children}
