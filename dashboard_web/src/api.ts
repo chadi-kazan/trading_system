@@ -41,7 +41,8 @@ async function handleResponse<T>(response: Response): Promise<T> {
     // Handle authentication errors by clearing invalid access key
     if (response.status === 401 || response.status === 403) {
       localStorage.removeItem(ACCESS_KEY_STORAGE);
-      window.location.reload(); // Reload to show login screen
+      // Dispatch custom event to trigger logout in the auth context
+      window.dispatchEvent(new CustomEvent('auth-error'));
     }
     const message = await response.text();
     throw new Error(message || `Request failed with status ${response.status}`);
